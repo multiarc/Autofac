@@ -10,6 +10,7 @@ using System.Runtime.CompilerServices;
 using Autofac.Core;
 using Autofac.Core.Activators.Reflection;
 using Autofac.Core.Registration;
+using Autofac.Core.Resolving.Pipeline;
 
 namespace Autofac
 {
@@ -33,7 +34,7 @@ namespace Autofac
         /// <param name="context">The context from which to resolve the service.</param>
         /// <param name="instance">The instance to inject properties into.</param>
         /// <returns><paramref name="instance"/>.</returns>
-        public static TService InjectProperties<TService>(this IComponentContext context, TService instance)
+        public static TService InjectProperties<TService>(this IResolveContext context, TService instance)
             where TService : notnull
         {
             AutowiringPropertyInjector.InjectProperties(context, instance, DefaultPropertySelector.OverwriteSetValueInstance, NoParameters);
@@ -49,7 +50,7 @@ namespace Autofac
         /// <param name="instance">The instance to inject properties into.</param>
         /// <param name="parameters">Optional parameters to use during the property injection.</param>
         /// <returns><paramref name="instance"/>.</returns>
-        public static TService InjectProperties<TService>(this IComponentContext context, TService instance, IEnumerable<Parameter> parameters)
+        public static TService InjectProperties<TService>(this IResolveContext context, TService instance, IEnumerable<Parameter> parameters)
             where TService : notnull
         {
             AutowiringPropertyInjector.InjectProperties(context, instance, DefaultPropertySelector.OverwriteSetValueInstance, parameters);
@@ -65,7 +66,7 @@ namespace Autofac
         /// <param name="instance">The instance to inject properties into.</param>
         /// <param name="parameters">Optional parameters to use during the property injection.</param>
         /// <returns><paramref name="instance"/>.</returns>
-        public static TService InjectProperties<TService>(this IComponentContext context, TService instance, params Parameter[] parameters)
+        public static TService InjectProperties<TService>(this IResolveContext context, TService instance, params Parameter[] parameters)
             where TService : notnull
         {
             AutowiringPropertyInjector.InjectProperties(context, instance, DefaultPropertySelector.OverwriteSetValueInstance, parameters);
@@ -81,7 +82,7 @@ namespace Autofac
         /// <param name="instance">The instance to inject properties into.</param>
         /// <param name="propertySelector">Selector to determine with properties should be injected.</param>
         /// <returns><paramref name="instance"/>.</returns>
-        public static TService InjectProperties<TService>(this IComponentContext context, TService instance, IPropertySelector propertySelector)
+        public static TService InjectProperties<TService>(this IResolveContext context, TService instance, IPropertySelector propertySelector)
             where TService : notnull
         {
             AutowiringPropertyInjector.InjectProperties(context, instance, propertySelector, NoParameters);
@@ -98,7 +99,7 @@ namespace Autofac
         /// <param name="propertySelector">Selector to determine with properties should be injected.</param>
         /// <param name="parameters">Optional parameters to use during the property injection.</param>
         /// <returns><paramref name="instance"/>.</returns>
-        public static TService InjectProperties<TService>(this IComponentContext context, TService instance, IPropertySelector propertySelector, IEnumerable<Parameter> parameters)
+        public static TService InjectProperties<TService>(this IResolveContext context, TService instance, IPropertySelector propertySelector, IEnumerable<Parameter> parameters)
             where TService : notnull
         {
             AutowiringPropertyInjector.InjectProperties(context, instance, propertySelector, parameters);
@@ -115,7 +116,7 @@ namespace Autofac
         /// <param name="propertySelector">Selector to determine with properties should be injected.</param>
         /// <param name="parameters">Optional parameters to use during the property injection.</param>
         /// <returns><paramref name="instance"/>.</returns>
-        public static TService InjectProperties<TService>(this IComponentContext context, TService instance, IPropertySelector propertySelector, params Parameter[] parameters)
+        public static TService InjectProperties<TService>(this IResolveContext context, TService instance, IPropertySelector propertySelector, params Parameter[] parameters)
             where TService : notnull
         {
             AutowiringPropertyInjector.InjectProperties(context, instance, propertySelector, parameters);
@@ -130,7 +131,7 @@ namespace Autofac
         /// <param name="context">The context from which to resolve the service.</param>
         /// <param name="instance">The instance to inject properties into.</param>
         /// <returns><paramref name="instance"/>.</returns>
-        public static TService InjectUnsetProperties<TService>(this IComponentContext context, TService instance)
+        public static TService InjectUnsetProperties<TService>(this IResolveContext context, TService instance)
             where TService : notnull
         {
             AutowiringPropertyInjector.InjectProperties(context, instance, DefaultPropertySelector.PreserveSetValueInstance, NoParameters);
@@ -146,7 +147,7 @@ namespace Autofac
         /// <param name="instance">The instance to inject properties into.</param>
         /// <param name="parameters">Optional parameters to use during the property injection.</param>
         /// <returns><paramref name="instance"/>.</returns>
-        public static TService InjectUnsetProperties<TService>(this IComponentContext context, TService instance, IEnumerable<Parameter> parameters)
+        public static TService InjectUnsetProperties<TService>(this IResolveContext context, TService instance, IEnumerable<Parameter> parameters)
             where TService : notnull
         {
             AutowiringPropertyInjector.InjectProperties(context, instance, DefaultPropertySelector.PreserveSetValueInstance, parameters);
@@ -162,7 +163,7 @@ namespace Autofac
         /// <param name="instance">The instance to inject properties into.</param>
         /// <param name="parameters">Optional parameters to use during the property injection.</param>
         /// <returns><paramref name="instance"/>.</returns>
-        public static TService InjectUnsetProperties<TService>(this IComponentContext context, TService instance, params Parameter[] parameters)
+        public static TService InjectUnsetProperties<TService>(this IResolveContext context, TService instance, params Parameter[] parameters)
             where TService : notnull
         {
             AutowiringPropertyInjector.InjectProperties(context, instance, DefaultPropertySelector.PreserveSetValueInstance, parameters);

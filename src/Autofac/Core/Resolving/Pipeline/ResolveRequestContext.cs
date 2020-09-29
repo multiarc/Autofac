@@ -10,7 +10,7 @@ using Autofac.Features.Decorators;
 namespace Autofac.Core.Resolving.Pipeline
 {
     /// <inheritdoc />
-    public abstract class ResolveRequestContext : IComponentContext
+    public abstract class ResolveRequestContext : IResolveContext
     {
         /// <summary>
         /// Gets a reference to the owning resolve operation (which might emcompass multiple nested requests).

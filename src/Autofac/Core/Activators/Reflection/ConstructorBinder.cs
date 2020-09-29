@@ -6,6 +6,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq.Expressions;
 using System.Reflection;
+using Autofac.Core.Resolving.Pipeline;
 
 namespace Autofac.Core.Activators.Reflection
 {
@@ -63,7 +64,7 @@ namespace Autofac.Core.Activators.Reflection
         /// <param name="availableParameters">The set of all parameters.</param>
         /// <param name="context">The current component context.</param>
         /// <returns>The bind result.</returns>
-        public BoundConstructor Bind(IEnumerable<Parameter> availableParameters, IComponentContext context)
+        public BoundConstructor Bind(IEnumerable<Parameter> availableParameters, IResolveContext context)
         {
             if (availableParameters is null)
             {

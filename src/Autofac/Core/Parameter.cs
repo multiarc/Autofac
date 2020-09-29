@@ -4,6 +4,7 @@
 using System;
 using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
+using Autofac.Core.Resolving.Pipeline;
 
 namespace Autofac.Core
 {
@@ -26,6 +27,6 @@ namespace Autofac.Core
         /// will be set to null.</param>
         /// <returns>True if a value can be supplied; otherwise, false.</returns>
         [SuppressMessage("Microsoft.Design", "CA1021:AvoidOutParameters", MessageId = "2#")]
-        public abstract bool CanSupplyValue(ParameterInfo pi, IComponentContext context, [NotNullWhen(returnValue: true)] out Func<object?>? valueProvider);
+        public abstract bool CanSupplyValue(ParameterInfo pi, IResolveContext context, [NotNullWhen(returnValue: true)] out Func<object?>? valueProvider);
     }
 }

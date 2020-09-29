@@ -117,7 +117,7 @@ namespace Autofac.Core.Activators.Reflection
         /// The context parameter here should probably be ILifetimeScope in order to reveal Disposer,
         /// but will wait until implementing a concrete use case to make the decision.
         /// </remarks>
-        private object ActivateInstance(IComponentContext context, IEnumerable<Parameter> parameters)
+        private object ActivateInstance(IResolveContext context, IEnumerable<Parameter> parameters)
         {
             if (context == null)
             {
@@ -150,7 +150,7 @@ namespace Autofac.Core.Activators.Reflection
             return instance;
         }
 
-        private BoundConstructor[] GetAllBindings(ConstructorBinder[] availableConstructors, IComponentContext context, IEnumerable<Parameter> parameters)
+        private BoundConstructor[] GetAllBindings(ConstructorBinder[] availableConstructors, IResolveContext context, IEnumerable<Parameter> parameters)
         {
             // Most often, there will be no `parameters` and/or no `_defaultParameters`; in both of those cases we can avoid allocating.
             var prioritisedParameters = parameters.Any() ? EnumerateParameters(parameters) : _defaultParameters;
@@ -209,7 +209,7 @@ namespace Autofac.Core.Activators.Reflection
                 reasons);
         }
 
-        private void InjectProperties(object instance, IComponentContext context)
+        private void InjectProperties(object instance, IResolveContext context)
         {
             if (_configuredProperties.Length == 0)
             {

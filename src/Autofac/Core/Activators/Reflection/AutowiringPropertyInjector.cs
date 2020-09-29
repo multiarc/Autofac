@@ -6,6 +6,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using Autofac.Core.Resolving.Pipeline;
 using Autofac.Util;
 
 namespace Autofac.Core.Activators.Reflection
@@ -36,7 +37,7 @@ namespace Autofac.Core.Activators.Reflection
         /// <param name="instance">The instance to inject onto.</param>
         /// <param name="propertySelector">The property selector.</param>
         /// <param name="parameters">The set of parameters for the resolve that can be used to satisfy injectable properties.</param>
-        public static void InjectProperties(IComponentContext context, object instance, IPropertySelector propertySelector, IEnumerable<Parameter> parameters)
+        public static void InjectProperties(IResolveContext context, object instance, IPropertySelector propertySelector, IEnumerable<Parameter> parameters)
         {
             if (context == null)
             {

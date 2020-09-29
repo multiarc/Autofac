@@ -4,6 +4,7 @@
 using System;
 using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
+using Autofac.Core.Resolving.Pipeline;
 
 namespace Autofac.Core
 {
@@ -13,15 +14,15 @@ namespace Autofac.Core
     /// </summary>
     public class ResolvedParameter : Parameter
     {
-        private readonly Func<ParameterInfo, IComponentContext, bool> _predicate;
-        private readonly Func<ParameterInfo, IComponentContext, object?> _valueAccessor;
+        private readonly Func<ParameterInfo, IResolveContext, bool> _predicate;
+        private readonly Func<ParameterInfo, IResolveContext, object?> _valueAccessor;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ResolvedParameter"/> class.
         /// </summary>
         /// <param name="predicate">A predicate that determines which parameters on a constructor will be supplied by this instance.</param>
         /// <param name="valueAccessor">A function that supplies the parameter value given the context.</param>
-        public ResolvedParameter(Func<ParameterInfo, IComponentContext, bool> predicate, Func<ParameterInfo, IComponentContext, object?> valueAccessor)
+        public ResolvedParameter(Func<ParameterInfo, IResolveContext, bool> predicate, Func<ParameterInfo, IResolveContext, object?> valueAccessor)
         {
             _predicate = predicate ?? throw new ArgumentNullException(nameof(predicate));
             _valueAccessor = valueAccessor ?? throw new ArgumentNullException(nameof(valueAccessor));
@@ -36,7 +37,7 @@ namespace Autofac.Core
         /// be set to a function that will lazily retrieve the parameter value. If the result is false,
         /// will be set to null.</param>
         /// <returns>True if a value can be supplied; otherwise, false.</returns>
-        public override bool CanSupplyValue(ParameterInfo pi, IComponentContext context, [NotNullWhen(returnValue: true)] out Func<object?>? valueProvider)
+        public override bool CanSupplyValue(ParameterInfo pi, IResolveContext context, [NotNullWhen(returnValue: true)] out Func<object?>? valueProvider)
         {
             if (pi == null)
             {

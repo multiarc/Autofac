@@ -5,6 +5,7 @@ using System;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Reflection;
+using Autofac.Core.Resolving.Pipeline;
 
 namespace Autofac.Core.Activators.Reflection
 {
@@ -25,7 +26,7 @@ namespace Autofac.Core.Activators.Reflection
         /// <exception cref="System.ArgumentNullException">
         /// Thrown if <paramref name="pi" /> or <paramref name="context" /> is <see langword="null" />.
         /// </exception>
-        public override bool CanSupplyValue(ParameterInfo pi, IComponentContext context, [NotNullWhen(returnValue: true)] out Func<object?>? valueProvider)
+        public override bool CanSupplyValue(ParameterInfo pi, IResolveContext context, [NotNullWhen(returnValue: true)] out Func<object?>? valueProvider)
         {
             if (pi == null)
             {
