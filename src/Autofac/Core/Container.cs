@@ -1,35 +1,12 @@
-﻿// This software is part of the Autofac IoC container
-// Copyright © 2011 Autofac Contributors
-// http://autofac.org
-//
-// Permission is hereby granted, free of charge, to any person
-// obtaining a copy of this software and associated documentation
-// files (the "Software"), to deal in the Software without
-// restriction, including without limitation the rights to use,
-// copy, modify, merge, publish, distribute, sublicense, and/or sell
-// copies of the Software, and to permit persons to whom the
-// Software is furnished to do so, subject to the following
-// conditions:
-//
-// The above copyright notice and this permission notice shall be
-// included in all copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-// EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-// OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-// NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-// HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-// WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-// FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-// OTHER DEALINGS IN THE SOFTWARE.
+﻿// Copyright (c) Autofac Project. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using Autofac.Core.Activators.Delegate;
+using System.Threading.Tasks;
 using Autofac.Core.Lifetime;
-using Autofac.Core.Registration;
 using Autofac.Core.Resolving;
+using Autofac.Diagnostics;
 using Autofac.Util;
 
 namespace Autofac.Core
@@ -40,30 +17,16 @@ namespace Autofac.Core
     [DebuggerDisplay("Tag = {Tag}, IsDisposed = {IsDisposed}")]
     public class Container : Disposable, IContainer, IServiceProvider
     {
-        readonly IComponentRegistry _componentRegistry;
-
-        readonly ILifetimeScope _rootLifetimeScope;
+        private readonly LifetimeScope _rootLifetimeScope;
 
         /// <summary>
-        /// Create a new container.
+        /// Initializes a new instance of the <see cref="Container"/> class.
         /// </summary>
-        internal Container()
+        /// <param name="componentRegistry">The registry of components.</param>
+        internal Container(IComponentRegistry componentRegistry)
         {
-            _componentRegistry = new ComponentRegistry();
-
-            _componentRegistry.Register(new ComponentRegistration(
-                LifetimeScope.SelfRegistrationId,
-                new DelegateActivator(typeof(LifetimeScope), (c, p) =>
-                {
-                    throw new InvalidOperationException(ContainerResources.SelfRegistrationCannotBeActivated);
-                }),
-                new CurrentScopeLifetime(),
-                InstanceSharing.Shared,
-                InstanceOwnership.ExternallyOwned,
-                new Service[] { new TypedService(typeof(ILifetimeScope)), new TypedService(typeof(IComponentContext)) },
-                new Dictionary<string, object>()));
-
-            _rootLifetimeScope = new LifetimeScope(_componentRegistry);
+            ComponentRegistry = componentRegistry;
+            _rootLifetimeScope = new LifetimeScope(ComponentRegistry);
         }
 
         /// <summary>
@@ -93,7 +56,7 @@ namespace Autofac.Core
         /// will be disposed along with it.
         /// </summary>
         /// <param name="configurationAction">Action on a <see cref="ContainerBuilder"/>
-        /// that adds component registations visible only in the new scope.</param>
+        /// that adds component registrations visible only in the new scope.</param>
         /// <returns>A new lifetime scope.</returns>
         public ILifetimeScope BeginLifetimeScope(Action<ContainerBuilder> configurationAction)
         {
@@ -107,31 +70,28 @@ namespace Autofac.Core
         /// </summary>
         /// <param name="tag">The tag applied to the <see cref="ILifetimeScope"/>.</param>
         /// <param name="configurationAction">Action on a <see cref="ContainerBuilder"/>
-        /// that adds component registations visible only in the new scope.</param>
+        /// that adds component registrations visible only in the new scope.</param>
         /// <returns>A new lifetime scope.</returns>
         public ILifetimeScope BeginLifetimeScope(object tag, Action<ContainerBuilder> configurationAction)
         {
             return _rootLifetimeScope.BeginLifetimeScope(tag, configurationAction);
         }
 
-        /// <summary>
-        /// The disposer associated with this container. Instances can be associated
-        /// with it manually if required.
-        /// </summary>
-        public IDisposer Disposer
-        {
-            get { return _rootLifetimeScope.Disposer; }
-        }
+        /// <inheritdoc/>
+        public DiagnosticListener DiagnosticSource => _rootLifetimeScope.DiagnosticSource;
 
         /// <summary>
-        /// Tag applied to the lifetime scope.
+        /// Gets the disposer associated with this container. Instances can be associated
+        /// with it manually if required.
+        /// </summary>
+        public IDisposer Disposer => _rootLifetimeScope.Disposer;
+
+        /// <summary>
+        /// Gets the tag applied to the lifetime scope.
         /// </summary>
         /// <remarks>The tag applied to this scope and the contexts generated when
         /// it resolves component dependencies.</remarks>
-        public object Tag
-        {
-            get { return _rootLifetimeScope.Tag; }
-        }
+        public object Tag => _rootLifetimeScope.Tag;
 
         /// <summary>
         /// Fired when a new scope based on the current scope is beginning.
@@ -161,30 +121,18 @@ namespace Autofac.Core
         }
 
         /// <summary>
-        /// Associates services with the components that provide them.
+        /// Gets associated services with the components that provide them.
         /// </summary>
-        public IComponentRegistry ComponentRegistry
+        public IComponentRegistry ComponentRegistry { get; }
+
+        /// <inheritdoc />
+        public object ResolveComponent(ResolveRequest request)
         {
-            get { return _componentRegistry; }
+            return _rootLifetimeScope.ResolveComponent(request);
         }
 
         /// <summary>
-        /// Resolve an instance of the provided registration within the context.
-        /// </summary>
-        /// <param name="registration">The registration.</param>
-        /// <param name="parameters">Parameters for the instance.</param>
-        /// <returns>
-        /// The component instance.
-        /// </returns>
-        /// <exception cref="ComponentNotRegisteredException"/>
-        /// <exception cref="DependencyResolutionException"/>
-        public object ResolveComponent(IComponentRegistration registration, IEnumerable<Parameter> parameters)
-        {
-            return _rootLifetimeScope.ResolveComponent(registration, parameters);
-        }
-
-        /// <summary>
-        /// Releases unmanaged and - optionally - managed resources
+        /// Releases unmanaged and - optionally - managed resources.
         /// </summary>
         /// <param name="disposing"><c>true</c> to release both managed and unmanaged resources; <c>false</c> to release only unmanaged resources.</param>
         protected override void Dispose(bool disposing)
@@ -192,19 +140,34 @@ namespace Autofac.Core
             if (disposing)
             {
                 _rootLifetimeScope.Dispose();
-                _componentRegistry.Dispose();
+                ComponentRegistry.Dispose();
             }
 
             base.Dispose(disposing);
         }
 
+        /// <inheritdoc/>
+        protected override async ValueTask DisposeAsync(bool disposing)
+        {
+            if (disposing)
+            {
+                await _rootLifetimeScope.DisposeAsync().ConfigureAwait(false);
+
+                // Registries are not likely to have async tasks to dispose of,
+                // so we will leave it as a straight dispose.
+                ComponentRegistry.Dispose();
+            }
+
+            // Do not call the base, otherwise the standard Dispose will fire.
+        }
+
         /// <summary>
         /// Gets the service object of the specified type.
         /// </summary>
-        /// <param name="serviceType">An object that specifies the type of service object 
+        /// <param name="serviceType">An object that specifies the type of service object
         /// to get.</param>
         /// <returns>
-        /// A service object of type <paramref name="serviceType"/>.-or- null if there is 
+        /// A service object of type <paramref name="serviceType"/>.-or- null if there is
         /// no service object of type <paramref name="serviceType"/>.
         /// </returns>
         public object GetService(Type serviceType)

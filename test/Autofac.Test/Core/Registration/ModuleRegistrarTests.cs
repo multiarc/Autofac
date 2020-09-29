@@ -1,4 +1,7 @@
-﻿using System;
+﻿// Copyright (c) Autofac Project. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Autofac.Core.Registration;
@@ -22,8 +25,8 @@ namespace Autofac.Test.Core.Registration
             registrar.RegisterModule(new ModuleA()).RegisterModule(new ModuleB());
             var container = builder.Build();
             var strings = container.Resolve<IEnumerable<string>>();
-            Assert.True(strings.Contains("foo"));
-            Assert.True(strings.Contains("bar"));
+            Assert.Contains("foo", strings);
+            Assert.Contains("bar", strings);
         }
 
         [Fact]

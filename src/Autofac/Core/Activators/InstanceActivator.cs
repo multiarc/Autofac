@@ -1,29 +1,8 @@
-﻿// This software is part of the Autofac IoC container
-// Copyright © 2011 Autofac Contributors
-// http://autofac.org
-//
-// Permission is hereby granted, free of charge, to any person
-// obtaining a copy of this software and associated documentation
-// files (the "Software"), to deal in the Software without
-// restriction, including without limitation the rights to use,
-// copy, modify, merge, publish, distribute, sublicense, and/or sell
-// copies of the Software, and to permit persons to whom the
-// Software is furnished to do so, subject to the following
-// conditions:
-//
-// The above copyright notice and this permission notice shall be
-// included in all copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-// EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-// OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-// NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-// HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-// WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-// FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-// OTHER DEALINGS IN THE SOFTWARE.
+﻿// Copyright (c) Autofac Project. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System;
+using System.Runtime.CompilerServices;
 using Autofac.Util;
 
 namespace Autofac.Core.Activators
@@ -33,25 +12,19 @@ namespace Autofac.Core.Activators
     /// </summary>
     public abstract class InstanceActivator : Disposable
     {
-        readonly Type _limitType;
-
         /// <summary>
-        /// Create an instance activator that will return instances compatible
-        /// with <paramref name="limitType"/>.
+        /// Initializes a new instance of the <see cref="InstanceActivator"/> class.
         /// </summary>
         /// <param name="limitType">Most derived type to which instances can be cast.</param>
         protected InstanceActivator(Type limitType)
         {
-            _limitType = Enforce.ArgumentNotNull(limitType, "limitType");
+            LimitType = limitType ?? throw new ArgumentNullException(nameof(limitType));
         }
 
         /// <summary>
-        /// The most specific type that the component instances are known to be castable to.
+        /// Gets the most specific type that the component instances are known to be castable to.
         /// </summary>
-        public Type LimitType
-        {
-            get { return _limitType; }
-        }
+        public Type LimitType { get; }
 
         /// <summary>
         /// Gets a string representation of the activator.
@@ -60,6 +33,18 @@ namespace Autofac.Core.Activators
         public override string ToString()
         {
             return LimitType.Name + " (" + GetType().Name + ")";
+        }
+
+        /// <summary>
+        /// Asserts that the activator has not been disposed.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        protected void CheckNotDisposed()
+        {
+            if (IsDisposed)
+            {
+                throw new ObjectDisposedException(InstanceActivatorResources.InstanceActivatorDisposed, innerException: null);
+            }
         }
     }
 }

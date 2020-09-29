@@ -1,4 +1,7 @@
-﻿using System;
+﻿// Copyright (c) Autofac Project. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
+using System;
 using System.Linq;
 using System.Reflection;
 using Autofac.Core;
@@ -7,29 +10,20 @@ using Xunit;
 
 namespace Autofac.Test.Core.Activators.Reflection
 {
-    public class MostParametersConstructorSelectorFixture
+    public class MostParametersConstructorSelectorTests
     {
-        // ReSharper disable ClassNeverInstantiated.Local
-
         [Fact]
         public void DoesNotAcceptNullBindings()
         {
             var target = new MostParametersConstructorSelector();
-            Assert.Throws<ArgumentNullException>(() => target.SelectConstructorBinding(null));
+            Assert.Throws<ArgumentNullException>(() => target.SelectConstructorBinding(null, Enumerable.Empty<Parameter>()));
         }
 
         [Fact]
         public void DoesNotAcceptEmptyBindings()
         {
             var target = new MostParametersConstructorSelector();
-            Assert.Throws<ArgumentOutOfRangeException>(() => target.SelectConstructorBinding(new ConstructorParameterBinding[] { }));
-        }
-
-        public class ThreeConstructors
-        {
-            public ThreeConstructors() { }
-            public ThreeConstructors(int i, string s) { }
-            public ThreeConstructors(int i) { }
+            Assert.Throws<ArgumentOutOfRangeException>(() => target.SelectConstructorBinding(new BoundConstructor[] { }, Enumerable.Empty<Parameter>()));
         }
 
         [Fact]
@@ -38,16 +32,20 @@ namespace Autofac.Test.Core.Activators.Reflection
             var constructors = GetBindingsForAllConstructorsOf<ThreeConstructors>();
             var target = new MostParametersConstructorSelector();
 
-            var chosen = target.SelectConstructorBinding(constructors);
+            var chosen = target.SelectConstructorBinding(constructors, Enumerable.Empty<Parameter>());
 
-            Assert.NotNull(chosen);
             Assert.Equal(2, chosen.TargetConstructor.GetParameters().Length);
         }
 
-        class TwoConstructors
+        [Fact]
+        public void IgnoresInvalidConstructor()
         {
-            public TwoConstructors(int i) { }
-            public TwoConstructors(string s) { }
+            var constructors = GetBindingsForAllConstructorsOf<OneValidConstructorOneInvalid>();
+            var target = new MostParametersConstructorSelector();
+
+            var chosen = target.SelectConstructorBinding(constructors, Enumerable.Empty<Parameter>());
+
+            Assert.Single(chosen.TargetConstructor.GetParameters());
         }
 
         [Fact]
@@ -56,16 +54,62 @@ namespace Autofac.Test.Core.Activators.Reflection
             var constructors = GetBindingsForAllConstructorsOf<TwoConstructors>();
             var target = new MostParametersConstructorSelector();
 
-            Assert.Throws<DependencyResolutionException>(() => target.SelectConstructorBinding(constructors));
+            Assert.Throws<DependencyResolutionException>(() => target.SelectConstructorBinding(constructors, Enumerable.Empty<Parameter>()));
         }
 
-        static ConstructorParameterBinding[] GetBindingsForAllConstructorsOf<TTarget>()
+        private static BoundConstructor[] GetBindingsForAllConstructorsOf<TTarget>()
         {
+            var builder = new ContainerBuilder();
+            builder.RegisterInstance("test");
+            builder.Register(ctx => 1);
+            var container = builder.Build();
+
             return typeof(TTarget).GetTypeInfo().DeclaredConstructors
-                .Select(ci => new ConstructorParameterBinding(ci, Enumerable.Empty<Parameter>(), new ContainerBuilder().Build()))
+                .Select(ci => new ConstructorBinder(ci).Bind(new[] { new AutowiringParameter() }, container))
                 .ToArray();
         }
 
-        // ReSharper restore ClassNeverInstantiated.Local
+        // Disable "unused parameter" warnings for test types.
+#pragma warning disable IDE0060
+
+        public class ThreeConstructors
+        {
+            public ThreeConstructors()
+            {
+            }
+
+            public ThreeConstructors(int i, string s)
+            {
+            }
+
+            public ThreeConstructors(int i)
+            {
+            }
+        }
+
+        public class OneValidConstructorOneInvalid
+        {
+            public OneValidConstructorOneInvalid(int i)
+            {
+            }
+
+            public OneValidConstructorOneInvalid(int i2, object bad)
+            {
+            }
+        }
+
+        private class TwoConstructors
+        {
+            public TwoConstructors(int i)
+            {
+            }
+
+            public TwoConstructors(string s)
+            {
+            }
+        }
+
+#pragma warning restore IDE0060
+
     }
 }

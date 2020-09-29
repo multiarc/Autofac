@@ -1,36 +1,17 @@
-﻿// This software is part of the Autofac IoC container
-// Copyright © 2011 Autofac Contributors
-// http://autofac.org
-//
-// Permission is hereby granted, free of charge, to any person
-// obtaining a copy of this software and associated documentation
-// files (the "Software"), to deal in the Software without
-// restriction, including without limitation the rights to use,
-// copy, modify, merge, publish, distribute, sublicense, and/or sell
-// copies of the Software, and to permit persons to whom the
-// Software is furnished to do so, subject to the following
-// conditions:
-//
-// The above copyright notice and this permission notice shall be
-// included in all copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-// EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-// OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-// NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-// HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-// WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-// FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-// OTHER DEALINGS IN THE SOFTWARE.
+﻿// Copyright (c) Autofac Project. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System;
+using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 using System.Reflection;
 using Autofac.Core;
+using Autofac.Core.Registration;
 
 namespace Autofac
 {
     /// <summary>
-    /// Base class for user-defined modules. Modules can add a set of releated components
+    /// Base class for user-defined modules. Modules can add a set of related components
     /// to a container (<see cref="Module.Load"/>) or attach cross-cutting functionality
     /// to other components (<see cref="Module.AttachToComponentRegistration"/>.
     /// Modules are given special support in the XML configuration feature - see
@@ -44,20 +25,20 @@ namespace Autofac
     /// public class DataAccessModule : Module
     /// {
     ///     public string ConnectionString { get; set; }
-    ///     
+    ///
     ///     public override void Load(ContainerBuilder moduleBuilder)
     ///     {
     ///         moduleBuilder.RegisterGeneric(typeof(MyRepository&lt;&gt;))
     ///             .As(typeof(IRepository&lt;&gt;))
     ///             .InstancePerMatchingLifetimeScope(WebLifetime.Request);
-    ///         
+    ///
     ///         moduleBuilder.Register(c =&gt; new MyDbConnection(ConnectionString))
     ///             .As&lt;IDbConnection&gt;()
     ///             .InstancePerMatchingLifetimeScope(WebLifetime.Request);
     ///     }
     /// }
     /// </code>
-    /// Using the module:
+    /// Using the module...
     /// <code>
     /// var builder = new ContainerBuilder();
     /// builder.RegisterModule(new DataAccessModule { ConnectionString = "..." });
@@ -71,13 +52,17 @@ namespace Autofac
         /// Apply the module to the component registry.
         /// </summary>
         /// <param name="componentRegistry">Component registry to apply configuration to.</param>
-        public void Configure(IComponentRegistry componentRegistry)
+        public void Configure(IComponentRegistryBuilder componentRegistry)
         {
-            if (componentRegistry == null) throw new ArgumentNullException(nameof(componentRegistry));
+            if (componentRegistry == null)
+            {
+                throw new ArgumentNullException(nameof(componentRegistry));
+            }
 
-            var moduleBuilder = new ContainerBuilder();
+            var moduleBuilder = new ContainerBuilder(componentRegistry.Properties);
+
             Load(moduleBuilder);
-            moduleBuilder.Update(componentRegistry);
+            moduleBuilder.UpdateRegistry(componentRegistry);
             AttachToRegistrations(componentRegistry);
             AttachToSources(componentRegistry);
         }
@@ -90,7 +75,9 @@ namespace Autofac
         /// </remarks>
         /// <param name="builder">The builder through which components can be
         /// registered.</param>
-        protected virtual void Load(ContainerBuilder builder) { }
+        protected virtual void Load(ContainerBuilder builder)
+        {
+        }
 
         /// <summary>
         /// Override to attach module-specific functionality to a
@@ -101,7 +88,7 @@ namespace Autofac
         /// <param name="componentRegistry">The component registry.</param>
         /// <param name="registration">The registration to attach functionality to.</param>
         protected virtual void AttachToComponentRegistration(
-            IComponentRegistry componentRegistry,
+            IComponentRegistryBuilder componentRegistry,
             IComponentRegistration registration)
         {
         }
@@ -114,43 +101,51 @@ namespace Autofac
         /// <param name="componentRegistry">The component registry into which the source was added.</param>
         /// <param name="registrationSource">The registration source.</param>
         protected virtual void AttachToRegistrationSource(
-            IComponentRegistry componentRegistry,
+            IComponentRegistryBuilder componentRegistry,
             IRegistrationSource registrationSource)
         {
         }
 
-        void AttachToRegistrations(IComponentRegistry componentRegistry)
+        private void AttachToRegistrations(IComponentRegistryBuilder componentRegistry)
         {
-            if (componentRegistry == null) throw new ArgumentNullException("componentRegistry");
-            foreach (var registration in componentRegistry.Registrations)
-                AttachToComponentRegistration(componentRegistry, registration);
+            if (componentRegistry == null)
+            {
+                throw new ArgumentNullException(nameof(componentRegistry));
+            }
+
             componentRegistry.Registered +=
-                (sender, e) => AttachToComponentRegistration(e.ComponentRegistry, e.ComponentRegistration);
+                (sender, e) => AttachToComponentRegistration(e.ComponentRegistryBuilder, e.ComponentRegistration);
         }
 
-        void AttachToSources(IComponentRegistry componentRegistry)
+        private void AttachToSources(IComponentRegistryBuilder componentRegistry)
         {
-            if (componentRegistry == null) throw new ArgumentNullException("componentRegistry");
-            foreach (var source in componentRegistry.Sources)
-                AttachToRegistrationSource(componentRegistry, source);
+            if (componentRegistry == null)
+            {
+                throw new ArgumentNullException(nameof(componentRegistry));
+            }
+
             componentRegistry.RegistrationSourceAdded +=
                 (sender, e) => AttachToRegistrationSource(e.ComponentRegistry, e.RegistrationSource);
         }
 
         /// <summary>
-        /// The assembly in which the concrete module type is located. To avoid bugs whereby deriving from a module will
+        /// Gets the assembly in which the concrete module type is located. To avoid bugs whereby deriving from a module will
         /// change the target assembly, this property can only be used by modules that inherit directly from
         /// <see cref="Module"/>.
         /// </summary>
+        [SuppressMessage("Design", "CA1065:Do not raise exceptions in unexpected locations", Justification = "Prevent breaking change")]
         protected virtual Assembly ThisAssembly
         {
             get
             {
                 var thisType = GetType();
-                if (thisType.GetTypeInfo().BaseType != typeof(Module))
-                    throw new InvalidOperationException(ModuleResources.ThisAssemblyUnavailable);
+                var baseType = thisType.BaseType;
+                if (baseType != typeof(Module))
+                {
+                    throw new InvalidOperationException(string.Format(CultureInfo.CurrentCulture, ModuleResources.ThisAssemblyUnavailable, thisType, baseType));
+                }
 
-                return thisType.GetTypeInfo().Assembly;
+                return thisType.Assembly;
             }
         }
     }

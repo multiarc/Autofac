@@ -1,4 +1,7 @@
-﻿using System;
+﻿// Copyright (c) Autofac Project. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -11,8 +14,13 @@ namespace Autofac.Test.Util
     {
         public class WithTwoInvokes
         {
-            public void Invoke() { }
-            public void Invoke(string s) { }
+            public void Invoke()
+            {
+            }
+
+            public void Invoke(string s)
+            {
+            }
         }
 
         // Issue 179

@@ -1,29 +1,8 @@
-﻿// This software is part of the Autofac IoC container
-// Copyright © 2011 Autofac Contributors
-// http://autofac.org
-//
-// Permission is hereby granted, free of charge, to any person
-// obtaining a copy of this software and associated documentation
-// files (the "Software"), to deal in the Software without
-// restriction, including without limitation the rights to use,
-// copy, modify, merge, publish, distribute, sublicense, and/or sell
-// copies of the Software, and to permit persons to whom the
-// Software is furnished to do so, subject to the following
-// conditions:
-//
-// The above copyright notice and this permission notice shall be
-// included in all copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-// EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-// OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-// NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-// HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-// WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-// FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-// OTHER DEALINGS IN THE SOFTWARE.
+﻿// Copyright (c) Autofac Project. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 
@@ -38,34 +17,62 @@ namespace Autofac.Core.Activators.Reflection
         /// Selects the best constructor from the available constructors.
         /// </summary>
         /// <param name="constructorBindings">Available constructors.</param>
+        /// <param name="parameters">Parameters to the instance being resolved.</param>
         /// <returns>The best constructor.</returns>
         /// <exception cref='DependencyResolutionException'>A single unambiguous match could not be chosen.</exception>
-        public ConstructorParameterBinding SelectConstructorBinding(ConstructorParameterBinding[] constructorBindings)
+        public BoundConstructor SelectConstructorBinding(BoundConstructor[] constructorBindings, IEnumerable<Parameter> parameters)
         {
-            if (constructorBindings == null) throw new ArgumentNullException("constructorBindings");
-            if (constructorBindings.Length == 0) throw new ArgumentOutOfRangeException("constructorBindings");
+            if (constructorBindings == null)
+            {
+                throw new ArgumentNullException(nameof(constructorBindings));
+            }
+
+            if (constructorBindings.Length == 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(constructorBindings));
+            }
 
             if (constructorBindings.Length == 1)
+            {
                 return constructorBindings[0];
+            }
 
-            var withLength = constructorBindings
-                .Select(binding => new { Binding = binding, ConstructorParameterLength = binding.TargetConstructor.GetParameters().Length });
+            var highestArgCount = -1;
+            var countAtHighest = 0;
+            BoundConstructor? chosen = null;
 
-            var maxLength = withLength.Max(binding => binding.ConstructorParameterLength);
+            for (var idx = 0; idx < constructorBindings.Length; idx++)
+            {
+                var binding = constructorBindings[idx];
+                var count = binding.ArgumentCount;
 
-            var maximal = withLength
-                .Where(binding => binding.ConstructorParameterLength == maxLength)
-                .Select(ctor => ctor.Binding)
-                .ToArray();
+                if (!binding.CanInstantiate)
+                {
+                    continue;
+                }
 
-            if (maximal.Length == 1)
-                return maximal[0];
+                if (count > highestArgCount)
+                {
+                    highestArgCount = count;
+                    countAtHighest = 1;
+                    chosen = binding;
+                }
+                else if (count == highestArgCount)
+                {
+                    countAtHighest++;
+                }
+            }
+
+            if (countAtHighest == 1)
+            {
+                return chosen!;
+            }
 
             throw new DependencyResolutionException(string.Format(
                 CultureInfo.CurrentCulture,
                 MostParametersConstructorSelectorResources.UnableToChooseFromMultipleConstructors,
-                maxLength,
-                maximal[0].TargetConstructor.DeclaringType));
+                highestArgCount,
+                chosen!.TargetConstructor.DeclaringType));
         }
     }
 }

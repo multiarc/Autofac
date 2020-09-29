@@ -1,8 +1,12 @@
-﻿using System;
+﻿// Copyright (c) Autofac Project. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Autofac.Builder;
 using Autofac.Core;
+using Autofac.Core.Registration;
 using Autofac.Features.LightweightAdapters;
 using Xunit;
 
@@ -12,18 +16,19 @@ namespace Autofac.Test.Features.LightweightAdapters
     {
         public class AdaptingFromOneServiceToAnother
         {
-            readonly Service _from = new TypedService(typeof(object)),
-                    _to = new KeyedService("name", typeof(object));
+            private readonly Service _from = new TypedService(typeof(object));
 
-            readonly IEnumerable<IComponentRegistration> _adaptedFrom = new[]
-                {
-                    RegistrationBuilder.ForType<object>().CreateRegistration(),
-                    RegistrationBuilder.ForType<object>().CreateRegistration()
-                };
+            private readonly Service _to = new KeyedService("name", typeof(object));
 
-            readonly LightweightAdapterRegistrationSource _subject;
+            private readonly IEnumerable<IComponentRegistration> _adaptedFrom = new[]
+            {
+                RegistrationBuilder.ForType<object>().CreateRegistration(),
+                RegistrationBuilder.ForType<object>().CreateRegistration(),
+            };
 
-            readonly IEnumerable<IComponentRegistration> _adaptedTo;
+            private readonly LightweightAdapterRegistrationSource _subject;
+
+            private readonly IEnumerable<IComponentRegistration> _adaptedTo;
 
             public AdaptingFromOneServiceToAnother()
             {
@@ -31,7 +36,7 @@ namespace Autofac.Test.Features.LightweightAdapters
                 var rd = new RegistrationData(_to);
                 _subject = new LightweightAdapterRegistrationSource(rd, ad);
 
-                _adaptedTo = _subject.RegistrationsFor(_to, s => _adaptedFrom);
+                _adaptedTo = _subject.RegistrationsFor(_to, s => _adaptedFrom.Select(x => Mocks.GetResolvableImplementation(x)));
             }
 
             [Fact]
@@ -52,6 +57,7 @@ namespace Autofac.Test.Features.LightweightAdapters
                 Assert.True(_adaptedFrom.All(from => _adaptedTo.Any(to => to.Target == from)));
             }
         }
+
         public class ConstructingAnAdapterRegistrationSource
         {
             [Fact]

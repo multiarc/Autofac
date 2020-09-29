@@ -1,22 +1,24 @@
-﻿using System;
+﻿// Copyright (c) Autofac Project. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using Autofac.Builder;
-using Autofac.Core.Registration;
-using Autofac.Core.Lifetime;
-using Autofac.Core.Activators.Reflection;
 using Autofac.Core;
-using System.Reflection;
 using Autofac.Core.Activators.ProvidedInstance;
+using Autofac.Core.Activators.Reflection;
+using Autofac.Core.Lifetime;
+using Autofac.Core.Registration;
+using Autofac.Util;
 
 namespace Autofac.Test
 {
-    static class Factory
+    internal static class Factory
     {
         public static IComponentRegistration CreateSingletonRegistration(IEnumerable<Service> services, IInstanceActivator activator)
         {
-            return CreateRegistration(services, activator, new RootScopeLifetime(), InstanceSharing.Shared);
+            return CreateRegistration(services, activator, RootScopeLifetime.Instance, InstanceSharing.Shared);
         }
 
         public static IComponentRegistration CreateSingletonRegistration(Type implementation)
@@ -35,15 +37,20 @@ namespace Autofac.Test
                 sharing,
                 InstanceOwnership.OwnedByLifetimeScope,
                 services,
-                NoMetadata);
+                GetDefaultMetadata());
         }
 
-        public static IComponentRegistration CreateSingletonObjectRegistration(object instance)
+        public static IComponentRegistration CreateSingletonRegistration<T>(T instance)
         {
             return RegistrationBuilder
                 .ForDelegate((c, p) => instance)
                 .SingleInstance()
                 .CreateRegistration();
+        }
+
+        public static IComponentRegistration CreateSingletonObjectRegistration(object instance)
+        {
+            return CreateSingletonRegistration(instance);
         }
 
         public static IComponentRegistration CreateSingletonObjectRegistration()
@@ -78,15 +85,51 @@ namespace Autofac.Test
                 properties);
         }
 
+        public static ReflectionActivator CreateReflectionActivator(Type implementation, IConstructorSelector customSelector)
+        {
+            return new ReflectionActivator(
+                implementation,
+                new DefaultConstructorFinder(),
+                customSelector,
+                NoParameters,
+                NoProperties);
+        }
+
         public static ProvidedInstanceActivator CreateProvidedInstanceActivator(object instance)
         {
             return new ProvidedInstanceActivator(instance);
         }
 
-        public static readonly IContainer EmptyContainer = new Container();
-        public static readonly IComponentContext EmptyContext = new Container();
+        private static IDictionary<string, object> GetDefaultMetadata()
+        {
+            return new Dictionary<string, object>
+            {
+                { MetadataKeys.RegistrationOrderMetadataKey, SequenceGenerator.GetNextUniqueSequence() },
+            };
+        }
+
+        public static IComponentRegistryBuilder CreateEmptyComponentRegistryBuilder()
+        {
+            return new ComponentRegistryBuilder(new DefaultRegisteredServicesTracker(), new Dictionary<string, object>());
+        }
+
+        public static IComponentRegistry CreateEmptyComponentRegistry()
+        {
+            return CreateEmptyComponentRegistryBuilder().Build();
+        }
+
+        public static IContainer CreateEmptyContainer()
+        {
+            return new ContainerBuilder().Build();
+        }
+
+        public static IComponentContext CreateEmptyContext()
+        {
+            return CreateEmptyContainer();
+        }
+
         public static readonly IEnumerable<Parameter> NoParameters = Enumerable.Empty<Parameter>();
+
         public static readonly IEnumerable<Parameter> NoProperties = Enumerable.Empty<Parameter>();
-        public static readonly IDictionary<string, object> NoMetadata = new Dictionary<string, object>();
     }
 }

@@ -1,4 +1,7 @@
-﻿using System;
+﻿// Copyright (c) Autofac Project. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
+using System;
 using Xunit;
 
 namespace Autofac.Test.Features.LazyDependencies
@@ -12,7 +15,7 @@ namespace Autofac.Test.Features.LazyDependencies
             Assert.True(container.IsRegistered<Lazy<object>>());
         }
 
-        static IContainer GetContainerWithLazyObject()
+        private static IContainer GetContainerWithLazyObject()
         {
             var builder = new ContainerBuilder();
             builder.RegisterType<object>();
@@ -43,5 +46,38 @@ namespace Autofac.Test.Features.LazyDependencies
             var lazy = container.Resolve<Lazy<object>>();
             Assert.False(lazy.IsValueCreated);
         }
+
+        [Fact]
+        public void LazyWorksWithCircularPropertyDependencies()
+        {
+            var builder = new ContainerBuilder();
+
+            builder.RegisterType<A>()
+                .SingleInstance();
+            builder.RegisterType<B>()
+                .SingleInstance()
+                .PropertiesAutowired(PropertyWiringOptions.AllowCircularDependencies);
+
+            var container = builder.Build();
+            Assert.NotNull(container.Resolve<A>());
+        }
+
+        // Disable "unused parameter" warnings for test types.
+#pragma warning disable IDE0060
+
+        private class A
+        {
+            public A(Lazy<B> b)
+            {
+            }
+        }
+
+        private class B
+        {
+            public A A { get; set; }
+        }
+
+#pragma warning restore IDE0060
+
     }
 }

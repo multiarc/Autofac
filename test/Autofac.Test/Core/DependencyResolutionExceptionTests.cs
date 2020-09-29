@@ -1,64 +1,112 @@
-﻿using System;
-using System.Globalization;
+﻿// Copyright (c) Autofac Project. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
+using System;
+using System.IO;
+using System.Runtime.Serialization;
+using System.Runtime.Serialization.Formatters.Binary;
+using System.Security.Permissions;
 using Autofac.Core;
 using Xunit;
 
 namespace Autofac.Test.Core
 {
+    // ReSharper disable ClassNeverInstantiated.Local, UnusedParameter.Local
     public class DependencyResolutionExceptionTests
     {
-        public DependencyResolutionExceptionTests()
+        public class A
         {
-            //Explicitly set culture for comparison of Exception strings
-#if ASPNETCORE50
-            CultureInfo.CurrentCulture = CultureInfo.InvariantCulture;
-            CultureInfo.CurrentUICulture = CultureInfo.InvariantCulture;
-#else
-            System.Threading.Thread.CurrentThread.CurrentCulture = CultureInfo.InvariantCulture;
-            System.Threading.Thread.CurrentThread.CurrentUICulture = CultureInfo.InvariantCulture;
-#endif
+            public const string Message = "This is the original exception.";
+
+            public A()
+            {
+                throw new InvalidOperationException(Message);
+            }
+        }
+
+        public class B
+        {
+            public B(A a)
+            {
+            }
+        }
+
+        public class C
+        {
+            public C(B b)
+            {
+            }
         }
 
         [Fact]
-        public void Message_InnerExceptionMessageIncluded()
+        public void ExceptionMessageUnwrapsNestedResolutionFailures()
         {
-            // Issue 343: The inner exception message should be included in the main exception message.
-            var inner = new Exception("Can't find file.");
-            var dre = new DependencyResolutionException("Unable to resolve component.", inner);
-            Assert.True(dre.Message.Contains("Can't find file."), "The exception message should include the inner exception message.");
+            var builder = new ContainerBuilder();
+            builder.RegisterType<A>();
+            builder.Register(c => new B(c.Resolve<A>()));
+            builder.RegisterType<C>();
+
+            Exception ex;
+            using (var container = builder.Build())
+            {
+                ex = Assert.Throws<DependencyResolutionException>(() => container.Resolve<C>());
+            }
+
+            var n = GetType().FullName;
+            Assert.Equal($"An exception was thrown while activating {n}+C -> λ:{n}+B -> {n}+A.", ex.Message);
+
+            var inner = ex.InnerException;
+            Assert.IsType<DependencyResolutionException>(inner);
+            Assert.Equal("An exception was thrown while invoking the constructor 'Void .ctor()' on type 'A'.", inner.Message);
+
+            Assert.IsType<InvalidOperationException>(inner.InnerException);
+            Assert.Equal(A.Message, inner.InnerException.Message);
+        }
+
+        [Serializable]
+        public class CustomDependencyResolutionException : DependencyResolutionException
+        {
+            public int Value { get; }
+
+            public CustomDependencyResolutionException(int value)
+                : base(null)
+            {
+                Value = value;
+            }
+
+            protected CustomDependencyResolutionException(SerializationInfo info, StreamingContext context)
+                : base(info, context)
+            {
+                if (info == null)
+                {
+                    throw new ArgumentNullException(nameof(info));
+                }
+
+                Value = info.GetInt32(nameof(Value));
+            }
+
+            [SecurityPermission(SecurityAction.LinkDemand, Flags = SecurityPermissionFlag.SerializationFormatter)]
+            public override void GetObjectData(SerializationInfo info, StreamingContext context)
+            {
+                base.GetObjectData(info, context);
+
+                info.AddValue(nameof(Value), 123);
+            }
         }
 
         [Fact]
-        public void Message_NoInnerException()
+        public void SupportCustomRuntimeSerialization()
         {
-            // Issue 343: If there is no inner exception specified, the main exception message should not be modified.
-            var dre = new DependencyResolutionException("Unable to resolve component.");
-            Assert.Equal("Unable to resolve component.", dre.Message);
-        }
+            using (var stream = new MemoryStream())
+            {
+                var formatter = new BinaryFormatter();
+                formatter.Serialize(stream, new CustomDependencyResolutionException(123));
 
-        [Fact]
-        public void Message_NoMessageOrInnerException()
-        {
-            // Issue 343: If there is no message or inner exception specified, the main exception message should not be modified.
-            var dre = new DependencyResolutionException(null);
-            Assert.Equal("Exception of type 'Autofac.Core.DependencyResolutionException' was thrown.", dre.Message);
-        }
+                stream.Position = 0;
+                var exception = (CustomDependencyResolutionException)formatter.Deserialize(stream);
 
-        [Fact]
-        public void Message_NullInnerException()
-        {
-            // Issue 343: If there is a null inner exception specified, the main exception message should not be modified.
-            var dre = new DependencyResolutionException("Unable to resolve component.", null);
-            Assert.Equal("Unable to resolve component.", dre.Message);
-        }
-
-        [Fact]
-        public void Message_NullMessageWithInnerException()
-        {
-            // Issue 343: If there is no message but there is an inner exception specified, the main exception message should be modified.
-            var inner = new Exception("Can't find file.");
-            var dre = new DependencyResolutionException(null, inner);
-            Assert.True(dre.Message.Contains("Can't find file."), "The exception message should include the inner exception message.");
+                Assert.Equal(123, exception.Value);
+            }
         }
     }
 }

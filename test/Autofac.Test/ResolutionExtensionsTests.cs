@@ -1,9 +1,13 @@
-﻿using System;
-using Xunit;
+﻿// Copyright (c) Autofac Project. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
+using System;
 using Autofac.Core;
 using Autofac.Core.Activators.ProvidedInstance;
-using Autofac.Test.Scenarios.Parameterisation;
 using Autofac.Core.Registration;
+using Autofac.Test.Scenarios.Parameterisation;
+using Autofac.Test.Scenarios.WithProperty;
+using Xunit;
 
 namespace Autofac.Test
 {
@@ -12,9 +16,9 @@ namespace Autofac.Test
         [Fact]
         public void ResolvingUnregisteredService_ProvidesDescriptionInException()
         {
-            var target = new Container();
+            var target = Factory.CreateEmptyContainer();
             var ex = Assert.Throws<ComponentNotRegisteredException>(() => target.Resolve<object>());
-            Assert.True(ex.Message.Contains("System.Object"));
+            Assert.Contains("System.Object", ex.Message);
         }
 
         [Fact]
@@ -24,9 +28,9 @@ namespace Autofac.Test
                 new[] { new TypedService(typeof(object)), new TypedService(typeof(string)) },
                 Factory.CreateProvidedInstanceActivator("Hello"));
 
-            var target = new Container();
-
-            target.ComponentRegistry.Register(registration);
+            var builder = Factory.CreateEmptyComponentRegistryBuilder();
+            builder.Register(registration);
+            var target = new ContainerBuilder(builder).Build();
 
             Assert.True(target.IsRegistered<object>());
             Assert.True(target.IsRegistered<string>());
@@ -35,10 +39,12 @@ namespace Autofac.Test
         [Fact]
         public void WhenServiceIsRegistered_ResolveOptionalReturnsAnInstance()
         {
-            var target = new Container();
-            target.ComponentRegistry.Register(Factory.CreateSingletonRegistration(
+            var builder = Factory.CreateEmptyComponentRegistryBuilder();
+            builder.Register(Factory.CreateSingletonRegistration(
                 new[] { new TypedService(typeof(string)) },
                 new ProvidedInstanceActivator("Hello")));
+
+            var target = new ContainerBuilder(builder).Build();
 
             var inst = target.ResolveOptional<string>();
 
@@ -48,7 +54,7 @@ namespace Autofac.Test
         [Fact]
         public void WhenServiceNotRegistered_ResolveOptionalReturnsNull()
         {
-            var target = new Container();
+            var target = Factory.CreateEmptyContainer();
             var inst = target.ResolveOptional<string>();
             Assert.Null(inst);
         }
@@ -75,7 +81,7 @@ namespace Autofac.Test
             const string a = "Hello";
             const int b = 42;
             var builder = new ContainerBuilder();
-            
+
             builder.RegisterType<Parameterised>()
                 .WithParameter(
                     (pi, c) => pi.Name == "a",
@@ -88,7 +94,35 @@ namespace Autofac.Test
             var result = container.Resolve<Parameterised>();
 
             Assert.Equal(a, result.A);
-            Assert.Equal(b, result.B);            
+            Assert.Equal(b, result.B);
+        }
+
+        [Fact]
+        public void RegisterPropertyWithExpression()
+        {
+            const string a = "Hello";
+            const bool b = true;
+            var builder = new ContainerBuilder();
+
+            builder.RegisterType<WithProps>()
+                .WithProperty(x => x.A, a)
+                .WithProperty(x => x.B, b);
+
+            var container = builder.Build();
+            var result = container.Resolve<WithProps>();
+
+            Assert.Equal(a, result.A);
+            Assert.Equal(b, result.B);
+        }
+
+        [Fact]
+        public void RegisterPropertyWithExpressionFieldExceptions()
+        {
+            const string a = "Hello";
+            var builder = new ContainerBuilder();
+
+            Assert.Throws<ArgumentOutOfRangeException>(() =>
+                builder.RegisterType<WithProps>().WithProperty(x => x._field, a));
         }
     }
 }

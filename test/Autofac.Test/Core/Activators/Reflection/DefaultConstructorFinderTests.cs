@@ -1,4 +1,7 @@
-﻿using System;
+﻿// Copyright (c) Autofac Project. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
+using System;
 using System.Linq;
 using System.Reflection;
 using Autofac.Core.Activators.Reflection;
@@ -6,16 +9,6 @@ using Xunit;
 
 namespace Autofac.Test.Core.Activators.Reflection
 {
-    class HasConstructors
-    {
-        public HasConstructors() {}
-
-        // ReSharper disable UnusedMember.Local
-        // ReSharper disable UnusedParameter.Local
-        private HasConstructors(int value) {}
-        // ReSharper restore UnusedParameter.Local
-        // ReSharper restore UnusedMember.Local
-    }
     public class DefaultConstructorFinderTests
     {
         [Fact]
@@ -27,7 +20,7 @@ namespace Autofac.Test.Core.Activators.Reflection
 
             var constructors = finder.FindConstructors(targetType).ToList();
 
-            Assert.Equal(1, constructors.Count);
+            Assert.Single(constructors);
             Assert.Contains(publicConstructor, constructors);
         }
 
@@ -40,8 +33,25 @@ namespace Autofac.Test.Core.Activators.Reflection
 
             var constructors = finder.FindConstructors(targetType).ToList();
 
-            Assert.Equal(1, constructors.Count);
+            Assert.Single(constructors);
             Assert.Contains(privateConstructor, constructors);
         }
+
+        // Disable "unused parameter" warnings for test types.
+#pragma warning disable IDE0051,IDE0060
+
+        internal class HasConstructors
+        {
+            public HasConstructors()
+            {
+            }
+
+            private HasConstructors(int value)
+            {
+            }
+        }
+
+#pragma warning restore IDE0051,IDE0060
+
     }
 }

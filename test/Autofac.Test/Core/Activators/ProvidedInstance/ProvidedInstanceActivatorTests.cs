@@ -1,8 +1,9 @@
-﻿using System;
-using Xunit;
-using System.Linq;
+﻿// Copyright (c) Autofac Project. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
+using System;
 using Autofac.Core.Activators.ProvidedInstance;
-using Autofac.Core;
+using Xunit;
 
 namespace Autofac.Test.Component.Activation
 {
@@ -11,10 +12,7 @@ namespace Autofac.Test.Component.Activation
         [Fact]
         public void NullIsNotAValidInstance()
         {
-            Assert.Throws<ArgumentNullException>(delegate
-            {
-                new ProvidedInstanceActivator(null);
-            });
+            Assert.Throws<ArgumentNullException>(() => new ProvidedInstanceActivator(null));
         }
 
         [Fact]
@@ -24,7 +22,11 @@ namespace Autofac.Test.Component.Activation
 
             ProvidedInstanceActivator target = new ProvidedInstanceActivator(instance);
 
-            var actual = target.ActivateInstance(Factory.EmptyContainer, Factory.NoParameters);
+            var container = Factory.CreateEmptyContainer();
+
+            var invoker = target.GetPipelineInvoker(container.ComponentRegistry);
+
+            var actual = invoker(container, Factory.NoParameters);
 
             Assert.Same(instance, actual);
         }
@@ -37,12 +39,14 @@ namespace Autofac.Test.Component.Activation
             ProvidedInstanceActivator target =
                 new ProvidedInstanceActivator(instance);
 
-            target.ActivateInstance(Factory.EmptyContainer, Factory.NoParameters);
+            var container = Factory.CreateEmptyContainer();
 
-            Assert.Throws<InvalidOperationException>(delegate
-            {
-                target.ActivateInstance(Factory.EmptyContainer, Factory.NoParameters);
-            });
+            var invoker = target.GetPipelineInvoker(container.ComponentRegistry);
+
+            invoker(container, Factory.NoParameters);
+
+            Assert.Throws<InvalidOperationException>(() =>
+                invoker(container, Factory.NoParameters));
         }
     }
 }

@@ -1,4 +1,7 @@
-﻿using System;
+﻿// Copyright (c) Autofac Project. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
+using System;
 using System.Linq;
 using Autofac.Builder;
 using Autofac.Core;
@@ -9,14 +12,15 @@ namespace Autofac.Test.Builder
 {
     public class RegistrationBuilderTests
     {
-        class TestMetadata
+        internal class TestMetadata
         {
             public int A { get; set; }
+
             public string B { get; set; }
         }
 
         [Fact]
-        public void WhenPropetyFromStronglyTypedClassConfigured_ReflectedInComponentRegistration()
+        public void WhenPropertyFromStronglyTypedClassConfigured_ReflectedInComponentRegistration()
         {
             var builder = RegistrationBuilder.ForType<object>();
             builder.WithMetadata<TestMetadata>(ep => ep
@@ -44,7 +48,7 @@ namespace Autofac.Test.Builder
                 .As(new Service[0])
                 .CreateRegistration();
 
-            Assert.Equal(0, registration.Services.Count());
+            Assert.Empty(registration.Services);
         }
     }
 }

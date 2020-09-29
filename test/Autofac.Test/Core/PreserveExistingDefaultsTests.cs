@@ -1,6 +1,10 @@
-﻿using System;
+﻿// Copyright (c) Autofac Project. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
+using Autofac.Builder;
 using Xunit;
 
 namespace Autofac.Test.Core
@@ -91,7 +95,7 @@ namespace Autofac.Test.Core
             Assert.Equal("s3", container.Resolve<string>());
         }
 
-        [Fact(Skip = "Issue #272")]
+        [Fact]
         public void NestedScope_ComplexConsumerServicesResolve()
         {
             // This is an all-around "integration test" with property injection,
@@ -133,7 +137,7 @@ namespace Autofac.Test.Core
             Assert.Equal("s2", scope.Resolve<string>());
         }
 
-        [Fact(Skip = "Issue #272")]
+        [Fact]
         public void NestedScope_PreserveDefaultsCanFallBackToNestedParent()
         {
             var builder = new ContainerBuilder();
@@ -145,7 +149,7 @@ namespace Autofac.Test.Core
             Assert.Equal("s3", scope3.Resolve<string>());
         }
 
-        [Fact(Skip = "Issue #272")]
+        [Fact]
         public void NestedScope_PreserveDefaultsCanFallBackToParent()
         {
             var builder = new ContainerBuilder();
@@ -155,7 +159,7 @@ namespace Autofac.Test.Core
             Assert.Equal("s1", scope.Resolve<string>());
         }
 
-        [Fact(Skip = "Issue #272")]
+        [Fact]
         public void NestedScope_PreserveDefaultsCanFallBackToParentThroughMultipleNesting()
         {
             var builder = new ContainerBuilder();
@@ -202,13 +206,15 @@ namespace Autofac.Test.Core
         private class ComplexConsumer
         {
             public int Number { get; private set; }
+
             public string Text { get; private set; }
+
             public object Value { get; set; }
 
             public ComplexConsumer(int number, string text)
             {
-                this.Number = number;
-                this.Text = text;
+                Number = number;
+                Text = text;
             }
         }
     }

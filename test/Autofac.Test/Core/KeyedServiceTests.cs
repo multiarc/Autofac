@@ -1,6 +1,9 @@
-﻿using System;
-using Xunit;
+﻿// Copyright (c) Autofac Project. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
+using System;
 using Autofac.Core;
+using Xunit;
 
 namespace Autofac.Test.Core
 {
@@ -15,21 +18,15 @@ namespace Autofac.Test.Core
         }
 
         [Fact]
-        public void ContructorRequires_KeyNotNull()
+        public void ConstructorRequires_KeyNotNull()
         {
-            Assert.Throws<ArgumentNullException>(delegate
-            {
-                new KeyedService(null, typeof(object));
-            });
+            Assert.Throws<ArgumentNullException>(() => new KeyedService(null, typeof(object)));
         }
 
         [Fact]
-        public void ContructorRequires_TypeNotNull()
+        public void ConstructorRequires_TypeNotNull()
         {
-            Assert.Throws<ArgumentNullException>(delegate
-            {
-                new KeyedService("name", null);
-            });
+            Assert.Throws<ArgumentNullException>(() => new KeyedService("name", null));
         }
 
         [Fact]

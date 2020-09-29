@@ -1,79 +1,75 @@
-﻿using System.Collections.Generic;
+﻿// Copyright (c) Autofac Project. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
+using System.Collections.Generic;
 using System.Linq;
 using Xunit;
 
 namespace Autofac.Test.Features.OpenGenerics
 {
-    // ReSharper disable UnusedTypeParameter
-    public interface IService<T>
-    {
-        IService<T> Decorated { get; }
-    }
-    // ReSharper restore UnusedTypeParameter
-
-    public class ImplementorA<T> : IService<T>
-    {
-        public IService<T> Decorated
-        {
-            get { return this; }
-        }
-    }
-
-    public class ImplementorB<T> : IService<T>
-    {
-        public IService<T> Decorated
-        {
-            get { return this; }
-        }
-    }
-
-    public class StringImplementor : IService<string>
-    {
-        public IService<string> Decorated
-        {
-            get { return this; }
-        }
-    }
-
-    public abstract class Decorator<T> : IService<T>
-    {
-        readonly IService<T> _decorated;
-
-        protected Decorator(IService<T> decorated)
-        {
-            _decorated = decorated;
-        }
-
-        public IService<T> Decorated
-        {
-            get { return _decorated; }
-        }
-    }
-
-    public class DecoratorA<T> : Decorator<T>
-    {
-        public DecoratorA(IService<T> decorated) : base(decorated) { }
-    }
-
-    public class DecoratorB<T> : Decorator<T>
-    {
-        readonly string _parameter;
-
-        public DecoratorB(IService<T> decorated, string parameter) : base(decorated)
-        {
-            _parameter = parameter;
-        }
-
-        public string Parameter
-        {
-            get { return _parameter; }
-        }
-    }
     public class OpenGenericDecoratorTests
     {
-        const string ParameterValue = "Abc";
+        public interface IService<T>
+        {
+            IService<T> Decorated { get; }
+        }
 
-        IContainer _container;
+        public class ImplementorA<T> : IService<T>
+        {
+            public IService<T> Decorated
+            {
+                get { return this; }
+            }
+        }
+
+        public class ImplementorB<T> : IService<T>
+        {
+            public IService<T> Decorated
+            {
+                get { return this; }
+            }
+        }
+
+        public class StringImplementor : IService<string>
+        {
+            public IService<string> Decorated
+            {
+                get { return this; }
+            }
+        }
+
+        public abstract class Decorator<T> : IService<T>
+        {
+            protected Decorator(IService<T> decorated)
+            {
+                Decorated = decorated;
+            }
+
+            public IService<T> Decorated { get; }
+        }
+
+        public class DecoratorA<T> : Decorator<T>
+        {
+            public DecoratorA(IService<T> decorated)
+                : base(decorated)
+            {
+            }
+        }
+
+        public class DecoratorB<T> : Decorator<T>
+        {
+            public DecoratorB(IService<T> decorated, string parameter)
+                : base(decorated)
+            {
+                Parameter = parameter;
+            }
+
+            public string Parameter { get; }
+        }
+
+        private const string ParameterValue = "Abc";
+
+        private readonly IContainer _container;
 
         public OpenGenericDecoratorTests()
         {
@@ -81,7 +77,6 @@ namespace Autofac.Test.Features.OpenGenerics
             //    A -> B(p) -> ImplementorA
             //    A -> B(p) -> ImplementorB
             //    A -> B(p) -> StringImplementor (string only)
-
             var builder = new ContainerBuilder();
 
             builder.RegisterType<StringImplementor>()
@@ -153,7 +148,7 @@ namespace Autofac.Test.Features.OpenGenerics
         [Fact]
         public void ParametersArePassedToB()
         {
-            Assert.Equal(ParameterValue, ((DecoratorB<int>) _container.Resolve<IService<int>>().Decorated).Parameter);
+            Assert.Equal(ParameterValue, ((DecoratorB<int>)_container.Resolve<IService<int>>().Decorated).Parameter);
         }
     }
 }

@@ -1,27 +1,5 @@
-﻿// This software is part of the Autofac IoC container
-// Copyright © 2011 Autofac Contributors
-// http://autofac.org
-//
-// Permission is hereby granted, free of charge, to any person
-// obtaining a copy of this software and associated documentation
-// files (the "Software"), to deal in the Software without
-// restriction, including without limitation the rights to use,
-// copy, modify, merge, publish, distribute, sublicense, and/or sell
-// copies of the Software, and to permit persons to whom the
-// Software is furnished to do so, subject to the following
-// conditions:
-//
-// The above copyright notice and this permission notice shall be
-// included in all copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-// EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-// OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-// NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-// HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-// WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-// FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-// OTHER DEALINGS IN THE SOFTWARE.
+﻿// Copyright (c) Autofac Project. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System;
 using Autofac.Builder;
@@ -44,10 +22,10 @@ namespace Autofac
     /// {
     ///     // Note that handler is resolved from requestScope, not
     ///     // from the container:
-    ///     
+    ///
     ///     var handler = requestScope.Resolve&lt;IRequestHandler&gt;();
     ///     handler.Handle(request);
-    ///     
+    ///
     ///     // When requestScope is disposed, all resources used in processing
     ///     // the request will be released.
     /// }
@@ -69,7 +47,7 @@ namespace Autofac
     /// <seealso cref="IRegistrationBuilder{TLimit,TActivatorData,TRegistrationStyle}.InstancePerLifetimeScope"/>
     /// <seealso cref="InstanceSharing"/>
     /// <seealso cref="IComponentLifetime"/>
-    public interface ILifetimeScope : IComponentContext, IDisposable
+    public interface ILifetimeScope : IComponentContext, IDisposable, IAsyncDisposable
     {
         /// <summary>
         /// Begin a new nested scope. Component instances created via the new scope
@@ -97,7 +75,7 @@ namespace Autofac
         /// as the root scope.
         /// </remarks>
         /// <param name="configurationAction">Action on a <see cref="ContainerBuilder"/>
-        /// that adds component registations visible only in the new scope.</param>
+        /// that adds component registrations visible only in the new scope.</param>
         /// <returns>A new lifetime scope.</returns>
         ILifetimeScope BeginLifetimeScope(Action<ContainerBuilder> configurationAction);
 
@@ -113,12 +91,12 @@ namespace Autofac
         /// </remarks>
         /// <param name="tag">The tag applied to the <see cref="ILifetimeScope"/>.</param>
         /// <param name="configurationAction">Action on a <see cref="ContainerBuilder"/>
-        /// that adds component registations visible only in the new scope.</param>
+        /// that adds component registrations visible only in the new scope.</param>
         /// <returns>A new lifetime scope.</returns>
         ILifetimeScope BeginLifetimeScope(object tag, Action<ContainerBuilder> configurationAction);
 
         /// <summary>
-        /// The disposer associated with this <see cref="ILifetimeScope"/>.
+        /// Gets the disposer associated with this <see cref="ILifetimeScope"/>.
         /// Component instances can be associated with it manually if required.
         /// </summary>
         /// <remarks>Typical usage does not require interaction with this member- it
@@ -126,7 +104,7 @@ namespace Autofac
         IDisposer Disposer { get; }
 
         /// <summary>
-        /// The tag applied to the <see cref="ILifetimeScope"/>.
+        /// Gets the tag applied to the <see cref="ILifetimeScope"/>.
         /// </summary>
         /// <remarks>Tags allow a level in the lifetime hierarchy to be identified.
         /// In most applications, tags are not necessary.</remarks>

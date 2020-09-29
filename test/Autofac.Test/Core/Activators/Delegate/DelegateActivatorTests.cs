@@ -1,8 +1,11 @@
-﻿using System;
-using Xunit;
+﻿// Copyright (c) Autofac Project. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
+using System;
 using System.Linq;
-using Autofac.Core.Activators.Delegate;
 using Autofac.Core;
+using Autofac.Core.Activators.Delegate;
+using Xunit;
 
 namespace Autofac.Test.Component.Activation
 {
@@ -21,14 +24,17 @@ namespace Autofac.Test.Component.Activation
         }
 
         [Fact]
-        public void ActivateInstance_ReturnsResultOfInvokingSuppliedDelegate()
+        public void Pipeline_ReturnsResultOfInvokingSuppliedDelegate()
         {
             var instance = new object();
 
             var target =
                 new DelegateActivator(typeof(object), (c, p) => instance);
 
-            Assert.Same(instance, target.ActivateInstance(new ContainerBuilder().Build(), Enumerable.Empty<Parameter>()));
+            var container = Factory.CreateEmptyContainer();
+            var invoker = target.GetPipelineInvoker(container.ComponentRegistry);
+
+            Assert.Same(instance, invoker(container, Factory.NoParameters));
         }
 
         [Fact]
@@ -36,10 +42,13 @@ namespace Autofac.Test.Component.Activation
         {
             var target = new DelegateActivator(typeof(string), (c, p) => null);
 
-            var ex = Assert.Throws<DependencyResolutionException>(
-                () => target.ActivateInstance(new ContainerBuilder().Build(), Enumerable.Empty<Parameter>()));
+            var container = Factory.CreateEmptyContainer();
+            var invoker = target.GetPipelineInvoker(container.ComponentRegistry);
 
-            Assert.True(ex.Message.Contains(typeof(string).ToString()));
+            var ex = Assert.Throws<DependencyResolutionException>(
+                () => invoker(container, Factory.NoParameters));
+
+            Assert.Contains(typeof(string).ToString(), ex.Message);
         }
-	}
+    }
 }

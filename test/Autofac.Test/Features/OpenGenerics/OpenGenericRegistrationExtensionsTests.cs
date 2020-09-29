@@ -1,33 +1,35 @@
-﻿using System;
+﻿// Copyright (c) Autofac Project. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
+using System;
+using System.Collections.Generic;
 using System.Linq;
+using Autofac.Core;
 using Autofac.Features.OpenGenerics;
 using Xunit;
-using Autofac.Core;
-using System.Collections.Generic;
 
 namespace Autofac.Test.Features.OpenGenerics
 {
-    // ReSharper disable UnusedTypeParameter
-    public interface IG<T>
-    // ReSharper restore UnusedTypeParameter
-    {
-    }
-
-    public class G<T> : IG<T>
-    {
-        public G()
-        {
-        }
-
-        public G(int i)
-        {
-            I = i;
-        }
-
-        public int I { get; private set; }
-    }
     public class OpenGenericRegistrationExtensionsTests
     {
+        public interface IG<T>
+        {
+        }
+
+        public class G<T> : IG<T>
+        {
+            public G()
+            {
+            }
+
+            public G(int i)
+            {
+                I = i;
+            }
+
+            public int I { get; private set; }
+        }
+
         [Fact]
         public void BuildGenericRegistration()
         {
@@ -55,9 +57,8 @@ namespace Autofac.Test.Features.OpenGenerics
             var cb = new ContainerBuilder();
             cb.RegisterGeneric(typeof(G<>)).As(typeof(IG<>));
             var container = cb.Build();
-            IComponentRegistration cr;
             Assert.True(container.ComponentRegistry.TryGetRegistration(
-                new TypedService(typeof(IG<int>)), out cr));
+                new TypedService(typeof(IG<int>)), out IComponentRegistration cr));
             Assert.Equal(typeof(G<int>), cr.Activator.LimitType);
         }
 
@@ -112,11 +113,13 @@ namespace Autofac.Test.Features.OpenGenerics
             Assert.Throws<ArgumentException>(() => cb.RegisterGeneric(typeof(List<int>)));
         }
 
-        // ReSharper disable UnusedTypeParameter
-        public interface ITwoParams<T, U> { }
-        // ReSharper restore UnusedTypeParameter
+        public interface ITwoParams<T, TU>
+        {
+        }
 
-        public class TwoParams<T, U> : ITwoParams<T, U> { }
+        public class TwoParams<T, TU> : ITwoParams<T, TU>
+        {
+        }
 
         [Fact]
         public void MultipleTypeParametersAreMatched()
@@ -144,7 +147,7 @@ namespace Autofac.Test.Features.OpenGenerics
             var cb = new ContainerBuilder();
             cb.RegisterGeneric(typeof(G<>)).Named("n", typeof(IG<>));
             var c = cb.Build();
-            Assert.Equal(1, c.ResolveNamed<IEnumerable<IG<int>>>("n").Count());
+            Assert.Single(c.ResolveNamed<IEnumerable<IG<int>>>("n"));
         }
 
         [Fact]
@@ -153,7 +156,7 @@ namespace Autofac.Test.Features.OpenGenerics
             var cb = new ContainerBuilder();
             cb.RegisterGeneric(typeof(G<>)).Named("n", typeof(IG<>));
             var c = cb.Build();
-            Assert.Equal(0, c.Resolve<IEnumerable<IG<int>>>().Count());
+            Assert.Empty(c.Resolve<IEnumerable<IG<int>>>());
         }
 
         [Fact]
@@ -162,7 +165,7 @@ namespace Autofac.Test.Features.OpenGenerics
             var cb = new ContainerBuilder();
             cb.RegisterGeneric(typeof(G<>)).As(typeof(IG<>));
             var c = cb.Build();
-            Assert.Equal(1, c.Resolve<IEnumerable<IG<int>>>().Count());
+            Assert.Single(c.Resolve<IEnumerable<IG<int>>>());
         }
 
         public class FG<T>

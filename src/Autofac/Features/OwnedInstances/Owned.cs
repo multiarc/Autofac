@@ -1,30 +1,10 @@
-﻿// This software is part of the Autofac IoC container
-// Copyright © 2011 Autofac Contributors
-// http://autofac.org
-//
-// Permission is hereby granted, free of charge, to any person
-// obtaining a copy of this software and associated documentation
-// files (the "Software"), to deal in the Software without
-// restriction, including without limitation the rights to use,
-// copy, modify, merge, publish, distribute, sublicense, and/or sell
-// copies of the Software, and to permit persons to whom the
-// Software is furnished to do so, subject to the following
-// conditions:
-//
-// The above copyright notice and this permission notice shall be
-// included in all copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-// EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-// OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-// NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-// HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-// WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-// FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-// OTHER DEALINGS IN THE SOFTWARE.
+﻿// Copyright (c) Autofac Project. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Threading;
+using System.Threading.Tasks;
 using Autofac.Core;
 using Autofac.Util;
 
@@ -65,17 +45,17 @@ namespace Autofac.Features.OwnedInstances
     /// public class C
     /// {
     ///   IService _service;
-    ///   
+    ///
     ///   public C(Owned&lt;IService&gt; service)
     ///   {
     ///     _service = service;
     ///   }
-    ///   
+    ///
     ///   void DoWork()
     ///   {
     ///     _service.Value.DoSomething();
     ///   }
-    ///   
+    ///
     ///   void OnFinished()
     ///   {
     ///     _service.Dispose();
@@ -85,35 +65,29 @@ namespace Autofac.Features.OwnedInstances
     /// In general, rather than depending on <see cref="Owned{T}"/> directly, components will depend on
     /// System.Func&lt;Owned&lt;T&gt;&gt; in order to create and dispose of other components as required.
     /// </example>
+    [SuppressMessage("Microsoft.ApiDesignGuidelines", "CA2213", Justification = "False positive - the lifetime does get disposed.")]
     public class Owned<T> : Disposable
     {
-        T _value;
-        IDisposable _lifetime;
+        private IDisposable? _lifetime;
 
         /// <summary>
-        /// Create an instance of <see cref="Owned{T}"/>.
+        /// Initializes a new instance of the <see cref="Owned{T}"/> class.
         /// </summary>
         /// <param name="value">The value representing the instance.</param>
         /// <param name="lifetime">An IDisposable interface through which ownership can be released.</param>
         public Owned(T value, IDisposable lifetime)
         {
-            _value = value;
-            _lifetime = Enforce.ArgumentNotNull(lifetime, "lifetime");
+            Value = value;
+            _lifetime = lifetime ?? throw new ArgumentNullException(nameof(lifetime));
         }
 
         /// <summary>
-        /// The owned value.
+        /// Gets or sets the owned value.
         /// </summary>
-        public T Value
-        {
-            get
-            {
-                return _value;
-            }
-        }
+        public T Value { get; set; }
 
         /// <summary>
-        /// Releases unmanaged and - optionally - managed resources
+        /// Releases unmanaged and - optionally - managed resources.
         /// </summary>
         /// <param name="disposing"><c>true</c> to release both managed and unmanaged resources; <c>false</c> to release only unmanaged resources.</param>
         protected override void Dispose(bool disposing)
@@ -123,12 +97,38 @@ namespace Autofac.Features.OwnedInstances
                 var lt = Interlocked.Exchange(ref _lifetime, null);
                 if (lt != null)
                 {
-                    _value = default(T);
+                    Value = default!;
                     lt.Dispose();
                 }
             }
 
             base.Dispose(disposing);
+        }
+
+        /// <summary>
+        /// Releases unmanaged and - optionally - managed resources asynchronously.
+        /// </summary>
+        /// <param name="disposing"><c>true</c> to release both managed and unmanaged resources; <c>false</c> to release only unmanaged resources.</param>
+        protected override async ValueTask DisposeAsync(bool disposing)
+        {
+            if (disposing)
+            {
+                var lt = Interlocked.Exchange(ref _lifetime, null);
+                if (lt != null)
+                {
+                    Value = default!;
+                    if (lt is IAsyncDisposable asyncDisposable)
+                    {
+                        await asyncDisposable.DisposeAsync().ConfigureAwait(false);
+                    }
+                    else
+                    {
+                        lt.Dispose();
+                    }
+                }
+            }
+
+            // Don't call the base (which would just call the normal Dispose).
         }
     }
 }

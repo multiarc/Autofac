@@ -1,7 +1,14 @@
-﻿using System;
-using Xunit;
+﻿// Copyright (c) Autofac Project. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
+using System;
+using System.Threading.Tasks;
 using Autofac.Core;
+using Autofac.Core.Registration;
+using Autofac.Core.Resolving.Pipeline;
 using Autofac.Test.Scenarios.Parameterisation;
+using Autofac.Test.Util;
+using Xunit;
 
 namespace Autofac.Test.Core
 {
@@ -16,12 +23,12 @@ namespace Autofac.Test.Core
                 new Service[] { new KeyedService(name, typeof(string)) },
                 Factory.CreateReflectionActivator(typeof(object)));
 
-            var c = new Container();
-            c.ComponentRegistry.Register(r);
+            var builder = Factory.CreateEmptyComponentRegistryBuilder();
+            builder.Register(r);
 
-            object o;
+            var c = new ContainerBuilder(builder).Build();
 
-            Assert.True(c.TryResolveNamed(name, typeof(string), out o));
+            Assert.True(c.TryResolveNamed(name, typeof(string), out object o));
             Assert.NotNull(o);
 
             Assert.False(c.IsRegistered<object>());
@@ -90,11 +97,11 @@ namespace Autofac.Test.Core
             var component = new object();
 
             var cb = new ContainerBuilder();
-            cb.Register( c => component ).Keyed<object>( myKey );
+            cb.Register(c => component).Keyed<object>(myKey);
             var container = cb.Build();
 
-            var o = container.ResolveKeyed<object>( myKey );
-            Assert.Same( component, o );
+            var o = container.ResolveKeyed<object>(myKey);
+            Assert.Same(component, o);
         }
 
         [Fact]
@@ -114,7 +121,7 @@ namespace Autofac.Test.Core
         [Fact]
         public void ContainerProvidesILifetimeScopeAndIContext()
         {
-            var container = new Container();
+            var container = Factory.CreateEmptyContainer();
             Assert.True(container.IsRegistered<ILifetimeScope>());
             Assert.True(container.IsRegistered<IComponentContext>());
         }
@@ -122,7 +129,7 @@ namespace Autofac.Test.Core
         [Fact]
         public void ResolvingLifetimeScopeProvidesCurrentScope()
         {
-            var c = new Container();
+            var c = Factory.CreateEmptyContainer();
             var l = c.BeginLifetimeScope();
             Assert.Same(l, l.Resolve<ILifetimeScope>());
         }
@@ -130,7 +137,7 @@ namespace Autofac.Test.Core
         [Fact]
         public void ResolvingComponentContextProvidesCurrentScope()
         {
-            var c = new Container();
+            var c = Factory.CreateEmptyContainer();
             var l = c.BeginLifetimeScope();
             Assert.Same(l, l.Resolve<IComponentContext>());
         }
@@ -147,6 +154,70 @@ namespace Autofac.Test.Core
             var resolved = c.Resolve<object>();
 
             Assert.Same(supplied, resolved);
+        }
+
+        [Fact]
+        public void ReplaceInstance_RegistrationActivatingHandlerProvidesResultToRelease()
+        {
+            var builder = new ContainerBuilder();
+            builder.RegisterType<ReplaceableComponent>()
+                .OnActivating(c => c.ReplaceInstance(new ReplaceableComponent { IsReplaced = true }))
+                .OnRelease(c => Assert.True(c.IsReplaced));
+
+            using (var container = builder.Build())
+            {
+                container.Resolve<ReplaceableComponent>();
+            }
+        }
+
+        [Fact]
+        public void ReplaceInstance_ModuleActivatingHandlerProvidesResultToRelease()
+        {
+            var builder = new ContainerBuilder();
+            builder.RegisterModule<ReplaceInstanceModule>();
+            builder.RegisterType<ReplaceableComponent>()
+                .OnRelease(c => Assert.True(c.IsReplaced));
+
+            using (var container = builder.Build())
+            {
+                container.Resolve<ReplaceableComponent>();
+            }
+        }
+
+        [Fact]
+        public async ValueTask AsyncContainerDisposeTriggersAsyncServiceDispose()
+        {
+            var builder = new ContainerBuilder();
+            builder.Register(c => new AsyncDisposeTracker()).SingleInstance();
+
+            AsyncDisposeTracker tracker;
+
+            await using (var container = builder.Build())
+            {
+                tracker = container.Resolve<AsyncDisposeTracker>();
+
+                Assert.False(tracker.IsSyncDisposed);
+                Assert.False(tracker.IsAsyncDisposed);
+            }
+
+            Assert.False(tracker.IsSyncDisposed);
+            Assert.True(tracker.IsAsyncDisposed);
+        }
+
+        private class ReplaceInstanceModule : Module
+        {
+            protected override void AttachToComponentRegistration(IComponentRegistryBuilder componentRegistry, IComponentRegistration registration)
+            {
+                registration.PipelineBuilding += (o, builder) => builder.Use(PipelinePhase.Activation, (ctxt, next) =>
+                {
+                    ctxt.Instance = new ReplaceableComponent { IsReplaced = true };
+                });
+            }
+        }
+
+        private class ReplaceableComponent
+        {
+            public bool IsReplaced { get; set; }
         }
     }
 }

@@ -1,27 +1,5 @@
-﻿// This software is part of the Autofac IoC container
-// Copyright © 2011 Autofac Contributors
-// http://autofac.org
-//
-// Permission is hereby granted, free of charge, to any person
-// obtaining a copy of this software and associated documentation
-// files (the "Software"), to deal in the Software without
-// restriction, including without limitation the rights to use,
-// copy, modify, merge, publish, distribute, sublicense, and/or sell
-// copies of the Software, and to permit persons to whom the
-// Software is furnished to do so, subject to the following
-// conditions:
-//
-// The above copyright notice and this permission notice shall be
-// included in all copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-// EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-// OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-// NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-// HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-// WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-// FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-// OTHER DEALINGS IN THE SOFTWARE.
+﻿// Copyright (c) Autofac Project. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System;
 using System.Collections.Generic;
@@ -30,7 +8,9 @@ using System.Globalization;
 using System.Linq;
 using System.Reflection;
 using System.Text;
-using Autofac.Util;
+using Autofac.Builder;
+using Autofac.Core.Resolving;
+using Autofac.Core.Resolving.Pipeline;
 
 namespace Autofac.Core.Activators.Reflection
 {
@@ -40,15 +20,14 @@ namespace Autofac.Core.Activators.Reflection
     [SuppressMessage("Microsoft.Design", "CA1063:ImplementIDisposableCorrectly", Justification = "There is nothing in the derived class to dispose so no override is necessary.")]
     public class ReflectionActivator : InstanceActivator, IInstanceActivator
     {
-        readonly Type _implementationType;
-        readonly IConstructorSelector _constructorSelector;
-        readonly IConstructorFinder _constructorFinder;
-        readonly IEnumerable<Parameter> _configuredParameters;
-        readonly IEnumerable<Parameter> _configuredProperties;
-        readonly IEnumerable<Parameter> _defaultParameters;
+        private readonly Type _implementationType;
+        private readonly Parameter[] _configuredProperties;
+        private readonly Parameter[] _defaultParameters;
+
+        private ConstructorBinder[]? _constructorBinders;
 
         /// <summary>
-        /// Create an activator for the provided type.
+        /// Initializes a new instance of the <see cref="ReflectionActivator"/> class.
         /// </summary>
         /// <param name="implementationType">Type to activate.</param>
         /// <param name="constructorFinder">Constructor finder.</param>
@@ -61,32 +40,71 @@ namespace Autofac.Core.Activators.Reflection
             IConstructorSelector constructorSelector,
             IEnumerable<Parameter> configuredParameters,
             IEnumerable<Parameter> configuredProperties)
-            : base(Enforce.ArgumentNotNull(implementationType, "implementationType"))
+            : base(implementationType)
         {
+            if (configuredParameters == null)
+            {
+                throw new ArgumentNullException(nameof(configuredParameters));
+            }
+
+            if (configuredProperties == null)
+            {
+                throw new ArgumentNullException(nameof(configuredProperties));
+            }
+
             _implementationType = implementationType;
-            _constructorFinder = Enforce.ArgumentNotNull(constructorFinder, "constructorFinder");
-            _constructorSelector = Enforce.ArgumentNotNull(constructorSelector, "constructorSelector");
-            _configuredParameters = Enforce.ArgumentNotNull(configuredParameters, "configuredParameters");
-            _configuredProperties = Enforce.ArgumentNotNull(configuredProperties, "configuredProperties");
-
-            _defaultParameters = _configuredParameters.Concat(
-                new Parameter[] {new AutowiringParameter(), new DefaultValueParameter()});
+            ConstructorFinder = constructorFinder ?? throw new ArgumentNullException(nameof(constructorFinder));
+            ConstructorSelector = constructorSelector ?? throw new ArgumentNullException(nameof(constructorSelector));
+            _configuredProperties = configuredProperties.ToArray();
+            _defaultParameters = configuredParameters.Concat(new Parameter[] { new AutowiringParameter(), new DefaultValueParameter() }).ToArray();
         }
 
         /// <summary>
-        /// The constructor finder.
+        /// Gets the constructor finder.
         /// </summary>
-        public IConstructorFinder ConstructorFinder
-        {
-            get { return _constructorFinder; }
-        }
+        public IConstructorFinder ConstructorFinder { get; }
 
         /// <summary>
-        /// The constructor selector.
+        /// Gets the constructor selector.
         /// </summary>
-        public IConstructorSelector ConstructorSelector
+        public IConstructorSelector ConstructorSelector { get; }
+
+        /// <inheritdoc/>
+        public void ConfigurePipeline(IComponentRegistryServices componentRegistryServices, IResolvePipelineBuilder pipelineBuilder)
         {
-            get { return _constructorSelector; }
+            if (componentRegistryServices is null)
+            {
+                throw new ArgumentNullException(nameof(componentRegistryServices));
+            }
+
+            if (pipelineBuilder is null)
+            {
+                throw new ArgumentNullException(nameof(pipelineBuilder));
+            }
+
+            // Locate the possible constructors at container build time.
+            var availableConstructors = ConstructorFinder.FindConstructors(_implementationType);
+
+            if (availableConstructors.Length == 0)
+            {
+                throw new NoConstructorsFoundException(_implementationType, string.Format(CultureInfo.CurrentCulture, ReflectionActivatorResources.NoConstructorsAvailable, _implementationType, ConstructorFinder));
+            }
+
+            var binders = new ConstructorBinder[availableConstructors.Length];
+
+            for (var idx = 0; idx < availableConstructors.Length; idx++)
+            {
+                binders[idx] = new ConstructorBinder(availableConstructors[idx]);
+            }
+
+            _constructorBinders = binders;
+
+            pipelineBuilder.Use(ToString(), PipelinePhase.Activation, MiddlewareInsertionMode.EndOfPhase, (ctxt, next) =>
+            {
+                ctxt.Instance = ActivateInstance(ctxt, ctxt.Parameters);
+
+                next(ctxt);
+            });
         }
 
         /// <summary>
@@ -97,32 +115,33 @@ namespace Autofac.Core.Activators.Reflection
         /// <returns>The activated instance.</returns>
         /// <remarks>
         /// The context parameter here should probably be ILifetimeScope in order to reveal Disposer,
-        /// but will wait until implementing a concrete use case to make the decision
+        /// but will wait until implementing a concrete use case to make the decision.
         /// </remarks>
-        public object ActivateInstance(IComponentContext context, IEnumerable<Parameter> parameters)
+        private object ActivateInstance(IComponentContext context, IEnumerable<Parameter> parameters)
         {
-            if (context == null) throw new ArgumentNullException("context");
-            if (parameters == null) throw new ArgumentNullException("parameters");
+            if (context == null)
+            {
+                throw new ArgumentNullException(nameof(context));
+            }
 
-            var availableConstructors = _constructorFinder.FindConstructors(_implementationType);
+            if (parameters == null)
+            {
+                throw new ArgumentNullException(nameof(parameters));
+            }
 
-            if (availableConstructors.Length == 0)
-                throw new DependencyResolutionException(string.Format(
-                    CultureInfo.CurrentCulture, ReflectionActivatorResources.NoConstructorsAvailable, _implementationType, _constructorFinder));
+            CheckNotDisposed();
 
-            var constructorBindings = GetConstructorBindings(
-                context,
-                parameters,
-                availableConstructors);
+            var allBindings = GetAllBindings(_constructorBinders!, context, parameters);
 
-            var validBindings = constructorBindings
-                .Where(cb => cb.CanInstantiate)
-                .ToArray();
+            var selectedBinding = ConstructorSelector.SelectConstructorBinding(allBindings, parameters);
 
-            if (validBindings.Length == 0)
-                throw new DependencyResolutionException(GetBindingFailureMessage(constructorBindings));
-
-            var selectedBinding = _constructorSelector.SelectConstructorBinding(validBindings);
+            if (!selectedBinding.CanInstantiate)
+            {
+                throw new InvalidOperationException(string.Format(
+                    CultureInfo.CurrentCulture,
+                    ReflectionActivatorResources.ConstructorSelectorCannotSelectAnInvalidBinding,
+                    ConstructorSelector.GetType().Name));
+            }
 
             var instance = selectedBinding.Instantiate();
 
@@ -131,7 +150,48 @@ namespace Autofac.Core.Activators.Reflection
             return instance;
         }
 
-        string GetBindingFailureMessage(IEnumerable<ConstructorParameterBinding> constructorBindings)
+        private BoundConstructor[] GetAllBindings(ConstructorBinder[] availableConstructors, IComponentContext context, IEnumerable<Parameter> parameters)
+        {
+            // Most often, there will be no `parameters` and/or no `_defaultParameters`; in both of those cases we can avoid allocating.
+            var prioritisedParameters = parameters.Any() ? EnumerateParameters(parameters) : _defaultParameters;
+
+            var boundConstructors = new BoundConstructor[availableConstructors.Length];
+            var validBindings = availableConstructors.Length;
+
+            for (var idx = 0; idx < availableConstructors.Length; idx++)
+            {
+                var bound = availableConstructors[idx].Bind(prioritisedParameters, context);
+
+                boundConstructors[idx] = bound;
+
+                if (!bound.CanInstantiate)
+                {
+                    validBindings--;
+                }
+            }
+
+            if (validBindings == 0)
+            {
+                throw new DependencyResolutionException(GetBindingFailureMessage(boundConstructors));
+            }
+
+            return boundConstructors;
+        }
+
+        private IEnumerable<Parameter> EnumerateParameters(IEnumerable<Parameter> parameters)
+        {
+            foreach (var param in parameters)
+            {
+                yield return param;
+            }
+
+            foreach (var defaultParam in _defaultParameters)
+            {
+                yield return defaultParam;
+            }
+        }
+
+        private string GetBindingFailureMessage(BoundConstructor[] constructorBindings)
         {
             var reasons = new StringBuilder();
 
@@ -144,40 +204,35 @@ namespace Autofac.Core.Activators.Reflection
             return string.Format(
                 CultureInfo.CurrentCulture,
                 ReflectionActivatorResources.NoConstructorsBindable,
-                _constructorFinder, _implementationType, reasons);
+                ConstructorFinder,
+                _implementationType,
+                reasons);
         }
 
-        IEnumerable<ConstructorParameterBinding> GetConstructorBindings(
-            IComponentContext context,
-            IEnumerable<Parameter> parameters,
-            IEnumerable<ConstructorInfo> constructorInfo)
+        private void InjectProperties(object instance, IComponentContext context)
         {
-            var prioritisedParameters = parameters.Concat(_defaultParameters);
-
-            return constructorInfo.Select(ci => new ConstructorParameterBinding(ci, prioritisedParameters, context));
-        }
-
-        void InjectProperties(object instance, IComponentContext context)
-        {
-            if (!_configuredProperties.Any())
+            if (_configuredProperties.Length == 0)
+            {
                 return;
+            }
 
-            var actualProps = instance
-                .GetType().GetTypeInfo().DeclaredProperties
+            var actualProperties = instance
+                .GetType()
+                .GetRuntimeProperties()
                 .Where(pi => pi.CanWrite)
                 .ToList();
 
-            foreach (var prop in _configuredProperties)
+            foreach (var configuredProperty in _configuredProperties)
             {
-                foreach (var actual in actualProps)
+                foreach (var actualProperty in actualProperties)
                 {
-                    var setter = actual.SetMethod;
-                    Func<object> vp;
+                    var setter = actualProperty.SetMethod;
+
                     if (setter != null &&
-                        prop.CanSupplyValue(setter.GetParameters().First(), context, out vp))
+                        configuredProperty.CanSupplyValue(setter.GetParameters()[0], context, out var vp))
                     {
-                        actualProps.Remove(actual);
-                        actual.SetValue(instance, vp(), null);
+                        actualProperties.Remove(actualProperty);
+                        actualProperty.SetValue(instance, vp(), null);
                         break;
                     }
                 }

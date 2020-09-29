@@ -1,76 +1,56 @@
-﻿// This software is part of the Autofac IoC container
-// Copyright © 2011 Autofac Contributors
-// http://autofac.org
-//
-// Permission is hereby granted, free of charge, to any person
-// obtaining a copy of this software and associated documentation
-// files (the "Software"), to deal in the Software without
-// restriction, including without limitation the rights to use,
-// copy, modify, merge, publish, distribute, sublicense, and/or sell
-// copies of the Software, and to permit persons to whom the
-// Software is furnished to do so, subject to the following
-// conditions:
-//
-// The above copyright notice and this permission notice shall be
-// included in all copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-// EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-// OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-// NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-// HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-// WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-// FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-// OTHER DEALINGS IN THE SOFTWARE.
+﻿// Copyright (c) Autofac Project. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using Autofac.Core;
 using Autofac.Core.Lifetime;
+using Autofac.Core.Pipeline;
+using Autofac.Core.Registration;
 using Autofac.Util;
 
 namespace Autofac.Builder
 {
     /// <summary>
     /// Data common to all registrations made in the container, both direct (IComponentRegistration)
-    /// and dynamic (IRegistrationSource.)
+    /// and dynamic (IRegistrationSource).
     /// </summary>
     public class RegistrationData
     {
-        bool _defaultServiceOverridden;
-        Service _defaultService;
+        private bool _defaultServiceOverridden;
+        private Service _defaultService;
 
-        readonly ICollection<Service> _services = new HashSet<Service>();
+        private readonly ICollection<Service> _services = new HashSet<Service>();
 
-        InstanceOwnership _ownership = InstanceOwnership.OwnedByLifetimeScope;
-        IComponentLifetime _lifetime = new CurrentScopeLifetime();
-        InstanceSharing _sharing = InstanceSharing.None;
-        readonly IDictionary<string, object> _metadata = new Dictionary<string, object>();
-        readonly ICollection<EventHandler<PreparingEventArgs>> _preparingHandlers = new List<EventHandler<PreparingEventArgs>>();
-        readonly ICollection<EventHandler<ActivatingEventArgs<object>>> _activatingHandlers = new List<EventHandler<ActivatingEventArgs<object>>>();
-        readonly ICollection<EventHandler<ActivatedEventArgs<object>>> _activatedHandlers = new List<EventHandler<ActivatedEventArgs<object>>>();
+        private IComponentLifetime _lifetime = CurrentScopeLifetime.Instance;
 
         /// <summary>
-        /// Construct a RegistrationData instance.
+        /// Initializes a new instance of the <see cref="RegistrationData"/> class.
         /// </summary>
         /// <param name="defaultService">The default service that will be used if no others
         /// are added.</param>
         public RegistrationData(Service defaultService)
         {
-            if (defaultService == null) throw new ArgumentNullException("defaultService");
-            _defaultService = defaultService;
+            _defaultService = defaultService ?? throw new ArgumentNullException(nameof(defaultService));
+
+            Metadata = new Dictionary<string, object?>
+            {
+                { MetadataKeys.RegistrationOrderMetadataKey, SequenceGenerator.GetNextUniqueSequence() },
+            };
         }
 
         /// <summary>
-        /// The services explicitly assigned to the component.
+        /// Gets the services explicitly assigned to the component.
         /// </summary>
         public IEnumerable<Service> Services
         {
             get
             {
                 if (_defaultServiceOverridden)
+                {
                     return _services;
+                }
 
                 return _services.DefaultIfEmpty(_defaultService);
             }
@@ -84,10 +64,16 @@ namespace Autofac.Builder
         /// clear the default service.</remarks>
         public void AddServices(IEnumerable<Service> services)
         {
-            if (services == null) throw new ArgumentNullException("services");
+            if (services == null)
+            {
+                throw new ArgumentNullException(nameof(services));
+            }
+
             _defaultServiceOverridden = true; // important even when services is empty
             foreach (var service in services)
+            {
                 AddService(service);
+            }
         }
 
         /// <summary>
@@ -96,57 +82,59 @@ namespace Autofac.Builder
         /// <param name="service">The service to add.</param>
         public void AddService(Service service)
         {
-            if (service == null) throw new ArgumentNullException("service");
+            if (service == null)
+            {
+                throw new ArgumentNullException(nameof(service));
+            }
+
             _defaultServiceOverridden = true;
             _services.Add(service);
         }
 
         /// <summary>
-        /// The instance ownership assigned to the component.
+        /// Gets or sets the instance ownership assigned to the component.
         /// </summary>
-        public InstanceOwnership Ownership
-        {
-            get { return _ownership; }
-            set { _ownership = value; }
-        }
+        public InstanceOwnership Ownership { get; set; } = InstanceOwnership.OwnedByLifetimeScope;
 
         /// <summary>
-        /// The lifetime assigned to the component.
+        /// Gets or sets the lifetime assigned to the component.
         /// </summary>
         public IComponentLifetime Lifetime
         {
-            get { return _lifetime; }
-            set { _lifetime = Enforce.ArgumentNotNull(value, "lifetime"); }
+            get
+            {
+                return _lifetime;
+            }
+
+            set
+            {
+                _lifetime = value ?? throw new ArgumentNullException(nameof(value));
+            }
         }
 
         /// <summary>
-        /// The sharing mode assigned to the component.
+        /// Gets or sets the sharing mode assigned to the component.
         /// </summary>
-        public InstanceSharing Sharing
-        {
-            get { return _sharing; }
-            set { _sharing = value; }
-        }
+        public InstanceSharing Sharing { get; set; } = InstanceSharing.None;
 
         /// <summary>
-        /// Extended properties assigned to the component.
+        /// Gets the extended properties assigned to the component.
         /// </summary>
-        public IDictionary<string, object> Metadata { get { return _metadata; } }
+        public IDictionary<string, object?> Metadata { get; }
 
         /// <summary>
-        /// Handlers for the Preparing event.
+        /// Gets or sets the options for the registration.
         /// </summary>
-        public ICollection<EventHandler<PreparingEventArgs>> PreparingHandlers { get { return _preparingHandlers; } }
+        public RegistrationOptions Options { get; set; }
 
         /// <summary>
-        /// Handlers for the Activating event.
+        /// Gets or sets the callback used to register this component.
         /// </summary>
-        public ICollection<EventHandler<ActivatingEventArgs<object>>> ActivatingHandlers { get { return _activatingHandlers; } }
-
-        /// <summary>
-        /// Handlers for the Activated event.
-        /// </summary>
-        public ICollection<EventHandler<ActivatedEventArgs<object>>> ActivatedHandlers { get { return _activatedHandlers; } }
+        /// <value>
+        /// A <see cref="Builder.DeferredCallback"/> that contains the delegate
+        /// used to register this component with an <see cref="IComponentRegistry"/>.
+        /// </value>
+        public DeferredCallback? DeferredCallback { get; set; }
 
         /// <summary>
         /// Copies the contents of another RegistrationData object into this one.
@@ -161,27 +149,29 @@ namespace Autofac.Builder
         {
             if (that == null)
             {
-                throw new ArgumentNullException("that");
+                throw new ArgumentNullException(nameof(that));
             }
+
             Ownership = that.Ownership;
             Sharing = that.Sharing;
             Lifetime = that.Lifetime;
 
             _defaultServiceOverridden |= that._defaultServiceOverridden;
             if (includeDefaultService)
+            {
                 _defaultService = that._defaultService;
+            }
 
             AddAll(_services, that._services);
-            AddAll(Metadata, that.Metadata);
-            AddAll(PreparingHandlers, that.PreparingHandlers);
-            AddAll(ActivatingHandlers, that.ActivatingHandlers);
-            AddAll(ActivatedHandlers, that.ActivatedHandlers);
+            AddAll(Metadata, that.Metadata.Where(m => m.Key != MetadataKeys.RegistrationOrderMetadataKey));
         }
 
-        static void AddAll<T>(ICollection<T> to, IEnumerable<T> from)
+        private static void AddAll<T>(ICollection<T> to, IEnumerable<T> from)
         {
             foreach (var item in from)
+            {
                 to.Add(item);
+            }
         }
 
         /// <summary>

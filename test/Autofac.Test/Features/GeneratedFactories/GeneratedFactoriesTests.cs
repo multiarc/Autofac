@@ -1,4 +1,7 @@
-﻿using System;
+﻿// Copyright (c) Autofac Project. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Autofac.Builder;
@@ -78,7 +81,7 @@ namespace Autofac.Test.Features.GeneratedFactories
                 _qs = qs;
             }
 
-            private QuoteService _qs;
+            private readonly QuoteService _qs;
 
             public string Symbol { get; private set; }
 
@@ -139,7 +142,8 @@ namespace Autofac.Test.Features.GeneratedFactories
         public class StringHolder
         {
             public delegate StringHolder Factory();
-            public string S;
+
+            public string S { get; set; }
         }
 
         [Fact]
@@ -208,7 +212,7 @@ namespace Autofac.Test.Features.GeneratedFactories
         // is chosen in the presence of implicit collection support.
         public class HasCharIntCtor
         {
-            public string Str;
+            public string Str { get; private set; }
 
             public HasCharIntCtor(char c, int i)
             {
@@ -275,7 +279,6 @@ namespace Autofac.Test.Features.GeneratedFactories
             var a = factory(s);
             Assert.NotNull(a);
             Assert.Equal(s, a.P);
-
         }
 
         [Fact]
@@ -295,7 +298,6 @@ namespace Autofac.Test.Features.GeneratedFactories
             var a = factory(s);
             Assert.NotNull(a);
             Assert.Equal(s, a.P);
-
         }
 
         [Fact]
@@ -311,8 +313,8 @@ namespace Autofac.Test.Features.GeneratedFactories
             var factories = container.Resolve<IEnumerable<Func<object>>>();
 
             Assert.Equal(2, factories.Count());
-            Assert.True(factories.Any(f => f() == o1));
-            Assert.True(factories.Any(f => f() == o2));
+            Assert.Contains(factories, f => f() == o1);
+            Assert.Contains(factories, f => f() == o2);
         }
 
         [Fact]
@@ -384,9 +386,9 @@ namespace Autofac.Test.Features.GeneratedFactories
             // because of the redundant types in the constructor.
             public DuplicateConstructorParameterTypes(int a, int b, string c)
             {
-                this.A = a;
-                this.B = b;
-                this.C = c;
+                A = a;
+                B = b;
+                C = c;
             }
         }
     }

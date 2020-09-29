@@ -1,10 +1,8 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using Xunit;
-using Autofac.Core.Resolving;
+﻿// Copyright (c) Autofac Project. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using Autofac.Core;
+using Xunit;
 
 namespace Autofac.Test.Core.Resolving
 {
@@ -18,9 +16,8 @@ namespace Autofac.Test.Core.Resolving
 
             var target = builder.Build();
             var de = Assert.Throws<DependencyResolutionException>(() => target.Resolve<object>());
-            Assert.Null(de.InnerException);
-            Assert.True(de.Message.Contains("System.Object -> System.Object"));
-            Assert.False(de.Message.Contains("System.Object -> System.Object -> System.Object"));
+            Assert.Contains("λ:System.Object -> λ:System.Object", de.ToString());
+            Assert.DoesNotContain("λ:System.Object -> λ:System.Object -> λ:System.Object", de.Message);
         }
     }
 }

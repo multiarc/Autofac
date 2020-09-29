@@ -1,127 +1,91 @@
-# Autofac
+<p align="center">
+  <img src="https://autofac.org/img/autofac_web-banner_character.svg" width="250">
+</p>
+<p align="center">
+  <img src="https://autofac.org/img/autofac_logo-type.svg" height="100">
+</p>
 
-Autofac is an [IoC container](http://martinfowler.com/articles/injection.html) for Microsoft .NET. It manages the dependencies between classes so that **applications stay easy to change as they grow** in size and complexity. This is achieved by treating regular .NET classes as *[components](http://autofac.readthedocs.org/en/latest/glossary.html)*.
+Autofac is an [IoC container](http://martinfowler.com/articles/injection.html) for Microsoft .NET. It manages the dependencies between classes so that **applications stay easy to change as they grow** in size and complexity. This is achieved by treating regular .NET classes as *[components](https://autofac.readthedocs.io/en/latest/glossary.html)*.
 
+[![Build status](https://ci.appveyor.com/api/projects/status/s0vgb4m8tv9ar7we?svg=true)](https://ci.appveyor.com/project/Autofac/autofac) [![codecov](https://codecov.io/gh/Autofac/Autofac/branch/develop/graph/badge.svg)](https://codecov.io/gh/Autofac/Autofac) ![MyGet publish status](https://www.myget.org/BuildSource/Badge/autofac?identifier=e0f25040-634c-4b7d-aebe-0f62b9c465a8) [![NuGet](https://img.shields.io/nuget/v/Autofac.svg)](https://nuget.org/packages/Autofac)
 
-## NuGet Packages
+[![Autofac on Stack Overflow](https://img.shields.io/badge/stack%20overflow-autofac-orange.svg)](https://stackoverflow.com/questions/tagged/autofac) [![Join the chat at https://gitter.im/autofac/autofac](https://img.shields.io/gitter/room/autofac/autofac.svg)](https://gitter.im/autofac/autofac)
 
-You can get Autofac by [grabbing the latest NuGet packages](https://github.com/autofac/Autofac/wiki/Nu-Get-Packages) or using [our NuGet script builder](http://autofac.org/scriptgen/) to get exactly what you need. A few older versions remain for download [here](https://code.google.com/p/autofac/downloads/list).
+## Get Packages
 
-## Getting Help
+You can get Autofac by [grabbing the latest NuGet packages](https://github.com/autofac/Autofac/wiki/Nu-Get-Packages). If you're feeling adventurous, [continuous integration builds are on MyGet](https://www.myget.org/gallery/autofac).
 
-**Need help with Autofac?** We have [a documentation site](http://autofac.readthedocs.org/) as well as [API documentation](http://autofac.org/apidoc/). We're ready to answer your questions on [Stack Overflow](http://stackoverflow.com/questions/tagged/autofac) or check out the [discussion forum](https://groups.google.com/forum/#forum/autofac).
+[Release notes are available on the wiki](https://github.com/autofac/Autofac/wiki#release-notes).
 
-## Getting Started
+## Get Help
 
-Our [Getting Started](http://autofac.readthedocs.org/en/latest/getting-started/index.html) tutorial walks you through integrating Autofac with a simple application and gives you some starting points for learning more.
+**Need help with Autofac?** We have [a documentation site](https://autofac.readthedocs.io/) as well as [API documentation](https://autofac.org/apidoc/). We're ready to answer your questions on [Stack Overflow](https://stackoverflow.com/questions/tagged/autofac) or check out the [discussion forum](https://groups.google.com/forum/#forum/autofac).
 
-### Adding Components
+## Get Started
 
-_[Components are registered](http://autofac.readthedocs.org/en/latest/register/registration.html)_ with a `ContainerBuilder`:
+Our [Getting Started](https://autofac.readthedocs.io/en/latest/getting-started/index.html) tutorial walks you through integrating Autofac with a simple application and gives you some starting points for learning more.
+
+Super-duper quick start:
+
+[Register components with a `ContainerBuilder`](https://autofac.readthedocs.io/en/latest/register/registration.html) and then build the component container.
 
 ```C#
 var builder = new ContainerBuilder();
-```
 
-Autofac can use [a Linq expression, a .NET type, or a pre-built instance](http://autofac.readthedocs.org/en/latest/register/registration.html) as a component:
-
-```C#
 builder.Register(c => new TaskController(c.Resolve<ITaskRepository>()));
-
 builder.RegisterType<TaskController>();
-
 builder.RegisterInstance(new TaskController());
-```
-
-Or, Autofac can find and register the component types in an assembly:
-
-```C#
 builder.RegisterAssemblyTypes(controllerAssembly);
-```
 
-Calling `Build()` creates a _container_:
-
-```C#
 var container = builder.Build();
 ```
 
-To retrieve a _component instance_ from a container, a _[service](http://autofac.readthedocs.org/en/latest/glossary.html)_ is requested. By default, components provide their concrete type as a service:
+[Resolve services from a lifetime scope](https://autofac.readthedocs.io/en/latest/resolve/index.html) - either the container or a nested scope:
 
 ```C#
 var taskController = container.Resolve<TaskController>();
 ```
 
-To specify that the component’s service is an interface, the `As()` method is used at registration time:
+There is a growing number of [application integration libraries](https://autofac.readthedocs.io/en/latest/integration/index.html) that make using Autofac with your application a snap. Support for several popular frameworks is also available through the "Extras" packages.
 
-```C#
-builder.RegisterType<TaskController>().As<IController>();
-// enabling
-var taskController = container.Resolve<IController>();
-```
+**[Intrigued? Check out our Getting Started walkthrough!](https://autofac.readthedocs.io/en/latest/getting-started/index.html)**
 
-### Expressing Dependencies
+## Project
 
-When Autofac instantiates a component, it satisfies the component's _dependencies_ by finding and instantiating other components.
+Autofac is licensed under the MIT license, so you can comfortably use it in commercial applications (we still love [contributions](https://autofac.readthedocs.io/en/latest/contributors.html) though).
 
-Components express their dependencies to Autofac as constructor parameters:
+**File issues in the repo with the associated feature/code.**
 
-```C#
-public class TaskController : IController
-{
-    public TaskController(ITaskRepository tasks) { ... }
-}
-```
+- [Autofac](https://github.com/autofac/Autofac) - Core dependency resolution and common functions (this repo).
+- [Autofac.AspNetCore.Multitenant](https://github.com/autofac/Autofac.AspNetCore.Multitenant) - Multitenant DI support for ASP.NET Core applications.
+- [Autofac.Configuration](https://github.com/autofac/Autofac.Configuration) - JSON/XML file-based configuration support.
+- [Autofac.Extensions.DependencyInjection](https://github.com/autofac/Autofac.Extensions.DependencyInjection) - .NET Core integration for Autofac.
+- [Autofac.Extras.AggregateService](https://github.com/autofac/Autofac.Extras.AggregateService) - Dynamic aggregate service implementation generation.
+- [Autofac.Extras.AttributeMetadata](https://github.com/autofac/Autofac.Extras.AttributeMetadata) - Metadata scanning/filtering through attributes.
+- [Autofac.Extras.CommonServiceLocator](https://github.com/autofac/Autofac.Extras.CommonServiceLocator) - Common Service Locator implementation backed by Autofac.
+- [Autofac.Extras.DomainServices](https://github.com/autofac/Autofac.Extras.DomainServices) - RIA/domain services support.
+- [Autofac.Extras.DynamicProxy](https://github.com/autofac/Autofac.Extras.DynamicProxy) - Decorators and interceptors.
+- [Autofac.Extras.EnterpriseLibraryConfigurator](https://github.com/autofac/Autofac.Extras.EnterpriseLibraryConfigurator) - Enterprise Library 5 configuration support.
+- [Autofac.Extras.FakeItEasy](https://github.com/autofac/Autofac.Extras.FakeItEasy) - FakeItEasy mocking framework integration.
+- [Autofac.Extras.Moq](https://github.com/autofac/Autofac.Extras.Moq) - Moq mocking framework integration.
+- [Autofac.Extras.MvvmCross](https://github.com/autofac/Autofac.Extras.MvvmCross) - MvvmCross integration.
+- [Autofac.Extras.NHibernate](https://github.com/autofac/Autofac.Extras.NHibernate) - NHibernate integration.
+- [Autofac.Mef](https://github.com/autofac/Autofac.Mef) - MEF catalog integration.
+- [Autofac.Multitenant](https://github.com/autofac/Autofac.Multitenant) - Multitenant dependency resolution support.
+- [Autofac.Multitenant.Wcf](https://github.com/autofac/Autofac.Multitenant.Wcf) - Multitenant WCF service hosting.
+- [Autofac.Mvc](https://github.com/autofac/Autofac.Mvc) - ASP.NET MVC integration.
+- [Autofac.Mvc.Owin](https://github.com/autofac/Autofac.Mvc.Owin) - OWIN support for ASP.NET MVC.
+- [Autofac.Owin](https://github.com/autofac/Autofac.Owin) - Core OWIN support - shared middleware for request lifetime integration.
+- [Autofac.ServiceFabric](https://github.com/autofac/Autofac.ServiceFabric) - Application integration for Service Fabric services.
+- [Autofac.SignalR](https://github.com/autofac/Autofac.SignalR) - Application integration for SignalR.
+- [Autofac.Wcf](https://github.com/autofac/Autofac.Wcf) - WCF service hosting.
+- [Autofac.Web](https://github.com/autofac/Autofac.Web) - ASP.NET web forms integration.
+- [Autofac.WebApi](https://github.com/autofac/Autofac.WebApi) - Application integration for Web API.
+- [Autofac.WebApi.Owin](https://github.com/autofac/Autofac.WebApi.Owin) - OWIN support for Web API.
 
-In this case Autofac will look for another component that provides the `ITaskRepository` service and call the constructor of `TaskController` with that component as a parameter.
+## Contributing / Pull Requests
 
-If there is more than one constructor on a component type, Autofac will use the constructor with the most resolvable parameters.
-
-```C#
-public TaskController(ITaskRepository tasks)
-public TaskController(ITaskRepository tasks, ILog log)
-```
-
-Default parameter values can be used to express optional dependencies (properties can be used instead if you prefer):
-
-```C#
-public TaskController(ITaskRepository tasks, ILog log = null)
-```
-
-[Circular references](http://autofac.readthedocs.org/en/latest/advanced/circular-dependencies.html) can be constructed by declaring one of the parameters to be of type `Lazy<T>`.
-
-```C#
-public TaskController(Lazy<ITaskRepository> tasks)
-```
-
-Autofac understands an advanced vocabulary of "[relationship types](http://autofac.readthedocs.org/en/latest/resolve/relationships.html)" like `Lazy<T>`, `Func<T>`, `IEnumerable<T>` and others, to vary the relationship between a component and its dependencies.
-
-## Highlights
-
-Autofac keeps out of your way and places as few constraints on your design as possible.
-
-**Simple Extension Points:** [Activation events](http://autofac.readthedocs.org/en/latest/lifetime/events.html) like `OnActivating(e => e.Instance.Start())` can achieve a lot of customization in very little code.
-
-**Robust Resource Management:** Autofac [takes on the burden](http://autofac.readthedocs.org/en/latest/lifetime/disposal.html) of tracking disposable components to ensure that resources are released when they should be.
-
-**Flexible Module System:** Strike a balance between the deployment-time benefits of [XML configuration](http://autofac.readthedocs.org/en/latest/configuration/xml.html) and the clarity of C# code with [Autofac modules](http://autofac.readthedocs.org/en/latest/configuration/modules.html).
-
-## Status
-
-> Autofac moved to GitHub on the 22nd January, 2013. The process of cleaning up the issues list and wiki content is ongoing. You may stumble across some invalid links while we sort out problems from the migration. The code and NuGet packages all remain in a consistent state.
-
-You can get the latest releases from [NuGet](https://www.nuget.org/packages?q=Author%3A%22Autofac+Contributors%22+Owner%3A%22alexmg%22+Autofac*). [Release notes are available on the wiki](https://github.com/autofac/Autofac/wiki/Release-Notes).
-
-If you're feeling bold, you can get [continuous integration builds from MyGet](https://www.myget.org/gallery/autofac).
-
-![](https://www.myget.org/BuildSource/Badge/autofac?identifier=e0f25040-634c-4b7d-aebe-0f62b9c465a8)
-
-There is a growing number of [integrations](http://autofac.readthedocs.org/en/latest/integration/index.html) that make using Autofac with your application a snap. Support for several popular frameworks is also available through the "Extras" packages.
-
-Autofac is licensed under the MIT license, so you can comfortably use it in commercial applications (we still love [contributions](https://github.com/autofac/Autofac/wiki/Contribution-Guidelines) though).
-
-## Contributing
-
-Refer to the [Readme for Autofac Developers](https://github.com/autofac/Autofac/blob/master/developers.md)
-for setting up, building Autofac and generating the related documentation. We also have a [contributors guide](http://autofac.readthedocs.org/en/latest/contributors.html) to help you get started.
+Refer to the [Contributor Guide](https://github.com/autofac/Autofac/blob/master/CONTRIBUTING.md)
+for setting up and building Autofac source.
 
 

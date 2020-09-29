@@ -1,5 +1,9 @@
-﻿using System.Collections.Generic;
+﻿// Copyright (c) Autofac Project. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
+using System.Collections.Generic;
 using System.Linq;
+using Autofac.Core;
 using Autofac.Features.Indexed;
 using Autofac.Features.Metadata;
 using Autofac.Test.Scenarios.Adapters;
@@ -11,19 +15,22 @@ namespace Autofac.Test.Features.LightweightAdapters
     {
         public class AdaptingTypeToType
         {
-            readonly IEnumerable<Command> _commands = new[]
+            private readonly IEnumerable<Command> _commands = new[]
             {
                 new Command(),
-                new Command()
+                new Command(),
             };
 
-            readonly IEnumerable<IToolbarButton> _toolbarButtons;
+            private readonly IEnumerable<IToolbarButton> _toolbarButtons;
 
             public AdaptingTypeToType()
             {
                 var builder = new ContainerBuilder();
                 foreach (var command in _commands)
+                {
                     builder.RegisterInstance(command);
+                }
+
                 builder.RegisterAdapter<Command, ToolbarButton>(cmd => new ToolbarButton(cmd))
                     .As<IToolbarButton>();
                 var container = builder.Build();
@@ -50,19 +57,19 @@ namespace Autofac.Test.Features.LightweightAdapters
                 Assert.IsType<AnotherCommand>(anotherCommand);
             }
 
-
             [Fact]
             public void EachInstanceOfTheTargetTypeIsAdapted()
             {
                 Assert.True(_commands.All(cmd => _toolbarButtons.Any(b => b.Command == cmd)));
             }
         }
+
         public class OnTopOfAnotherAdapter
         {
-            readonly Command _from = new Command();
-            const string NameKey = "Name";
-            const string Name = "N";
-            readonly ToolbarButton _to;
+            private readonly Command _from = new Command();
+            private const string NameKey = "Name";
+            private const string Name = "N";
+            private readonly ToolbarButton _to;
 
             public OnTopOfAnotherAdapter()
             {
@@ -81,30 +88,98 @@ namespace Autofac.Test.Features.LightweightAdapters
             }
         }
 
-        public interface IService { }
+        public interface IService
+        {
+        }
 
-        // ReSharper disable ClassNeverInstantiated.Local
-        public class Implementer1 : IService { }
-        public class Implementer2 : IService { }
-        // ReSharper restore ClassNeverInstantiated.Local
+        public class Implementer1 : IService
+        {
+        }
+
+        public class Implementer2 : IService
+        {
+        }
 
         public class Decorator : IService
         {
-            readonly IService _decorated;
-
             public Decorator(IService decorated)
             {
-                _decorated = decorated;
+                Decorated = decorated;
             }
 
-            public IService Decorated
+            public IService Decorated { get; }
+        }
+
+        public class DecoratorParameterization
+        {
+            private readonly IContainer _container;
+
+            public DecoratorParameterization()
             {
-                get { return _decorated; }
+                var builder = new ContainerBuilder();
+                builder.Register((ctx, p) => new ParameterizedImplementer(p)).Named<IParameterizedService>("from");
+                builder.RegisterDecorator<IParameterizedService>((ctx, p, s) => new ParameterizedDecorator1(s, p), "from", "to");
+                builder.RegisterDecorator<IParameterizedService>((ctx, p, s) => new ParameterizedDecorator2(s, p), "to");
+                _container = builder.Build();
+            }
+
+            [Fact]
+            public void ParametersGoToTheDecoratedInstance()
+            {
+                var resolved = _container.Resolve<IParameterizedService>(TypedParameter.From<IService>(new Implementer1()));
+                var dec2 = Assert.IsType<ParameterizedDecorator2>(resolved);
+                Assert.Empty(dec2.Parameters);
+                var dec1 = Assert.IsType<ParameterizedDecorator1>(dec2.Implementer);
+                Assert.Empty(dec1.Parameters);
+                var imp = Assert.IsType<ParameterizedImplementer>(dec1.Implementer);
+                Assert.Single(imp.Parameters);
+            }
+
+            public interface IParameterizedService
+            {
+                IEnumerable<Parameter> Parameters { get; }
+            }
+
+            public class ParameterizedImplementer : IParameterizedService
+            {
+                public ParameterizedImplementer(IEnumerable<Parameter> parameters)
+                {
+                    Parameters = parameters;
+                }
+
+                public IEnumerable<Parameter> Parameters { get; }
+            }
+
+            public class ParameterizedDecorator1 : IParameterizedService
+            {
+                public ParameterizedDecorator1(IParameterizedService implementer, IEnumerable<Parameter> parameters)
+                {
+                    Implementer = implementer;
+                    Parameters = parameters;
+                }
+
+                public IParameterizedService Implementer { get; }
+
+                public IEnumerable<Parameter> Parameters { get; }
+            }
+
+            public class ParameterizedDecorator2 : IParameterizedService
+            {
+                public ParameterizedDecorator2(IParameterizedService implementer, IEnumerable<Parameter> parameters)
+                {
+                    Implementer = implementer;
+                    Parameters = parameters;
+                }
+
+                public IParameterizedService Implementer { get; }
+
+                public IEnumerable<Parameter> Parameters { get; }
             }
         }
+
         public class DecoratingANamedService
         {
-            readonly IContainer _container;
+            private readonly IContainer _container;
 
             public DecoratingANamedService()
             {
@@ -131,8 +206,8 @@ namespace Autofac.Test.Features.LightweightAdapters
                     .Select(d => d.Decorated);
 
                 Assert.Equal(2, all.Count());
-                Assert.True(all.Any(i => i is Implementer1));
-                Assert.True(all.Any(i => i is Implementer2));
+                Assert.Contains(all, i => i is Implementer1);
+                Assert.Contains(all, i => i is Implementer2);
             }
         }
     }

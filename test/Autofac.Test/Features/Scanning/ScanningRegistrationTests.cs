@@ -1,20 +1,24 @@
-﻿using System;
+﻿// Copyright (c) Autofac Project. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using Autofac.Builder;
-using Autofac.Features.Metadata;
-using Autofac.Features.Scanning;
-using Xunit;
-using Autofac.Test.Scenarios.ScannedAssembly;
 using Autofac.Core;
 using Autofac.Core.Lifetime;
+using Autofac.Features.Metadata;
+using Autofac.Features.Scanning;
+using Autofac.Test.Scenarios.ScannedAssembly;
+using Autofac.Test.Scenarios.ScannedAssembly.MetadataAttributeScanningScenario;
+using Xunit;
 
 namespace Autofac.Test.Features.Scanning
 {
     public class ScanningRegistrationTests
     {
-        static readonly Assembly ScenarioAssembly = typeof(AComponent).GetTypeInfo().Assembly;
+        private static readonly Assembly ScenarioAssembly = typeof(AComponent).GetTypeInfo().Assembly;
 
         [Fact]
         public void WhenAssemblyIsScannedTypesRegisteredByDefault()
@@ -226,7 +230,31 @@ namespace Autofac.Test.Features.Scanning
             var c = cb.Build();
 
             var r = c.RegistrationFor<ICommand<UndoCommandData>>();
-            Assert.True(r.Services.Contains(new TypedService(typeof(ICommand<RedoCommandData>))));
+            Assert.Contains(new TypedService(typeof(ICommand<RedoCommandData>)), r.Services);
+        }
+
+        [Fact]
+        public void AsClosedTypesOfWithServiceKeyShouldAssignKeyToAllRegistrations()
+        {
+            var cb = new ContainerBuilder();
+            cb.RegisterAssemblyTypes(typeof(ICommand<>).GetTypeInfo().Assembly)
+                .AsClosedTypesOf(typeof(ICommand<>), "command");
+            var c = cb.Build();
+
+            Assert.IsType<SaveCommand>(c.ResolveKeyed<ICommand<SaveCommandData>>("command"));
+            Assert.IsType<DeleteCommand>(c.ResolveKeyed<ICommand<DeleteCommandData>>("command"));
+        }
+
+        [Fact]
+        public void AsClosedTypesOfWithServiceKeyMappingShouldAssignKeyResultToEachRegistration()
+        {
+            var cb = new ContainerBuilder();
+            cb.RegisterAssemblyTypes(typeof(ICommand<>).GetTypeInfo().Assembly)
+                .AsClosedTypesOf(typeof(ICommand<>), t => t);
+            var c = cb.Build();
+
+            Assert.IsType<SaveCommand>(c.ResolveKeyed<ICommand<SaveCommandData>>(typeof(SaveCommand)));
+            Assert.IsType<DeleteCommand>(c.ResolveKeyed<ICommand<DeleteCommandData>>(typeof(DeleteCommand)));
         }
 
         [Fact]
@@ -258,9 +286,10 @@ namespace Autofac.Test.Features.Scanning
             cb.RegisterAssemblyTypes(typeof(A2Component).GetTypeInfo().Assembly)
                 .As<IAService>();
             var c = cb.Build();
+
             // Without the filter this line would throw anyway
             var a = c.Resolve<IEnumerable<IAService>>();
-            Assert.Equal(1, a.Count());
+            Assert.Single(a);
         }
 
         [Fact]
@@ -325,8 +354,8 @@ namespace Autofac.Test.Features.Scanning
 
             var c = cb.Build();
 
-            Assert.False(c.ComponentRegistry.Registrations.Any(r =>
-                r.Activator.LimitType == typeof(AComponent)));
+            Assert.DoesNotContain(c.ComponentRegistry.Registrations, r =>
+                r.Activator.LimitType == typeof(AComponent));
         }
 
         [Fact]
@@ -334,8 +363,8 @@ namespace Autofac.Test.Features.Scanning
         {
             var c = RegisterScenarioAssembly(a => a.As(t => t.GetInterfaces()));
             var cd1 = c.ComponentRegistry.Registrations.Single(r => r.Activator.LimitType == typeof(A2Component));
-            Assert.True(cd1.Services.Contains(new TypedService(typeof(IAService))));
-            Assert.True(cd1.Services.Contains(new TypedService(typeof(IBService))));
+            Assert.Contains(new TypedService(typeof(IAService)), cd1.Services);
+            Assert.Contains(new TypedService(typeof(IBService)), cd1.Services);
         }
 
         [Fact]
@@ -367,17 +396,15 @@ namespace Autofac.Test.Features.Scanning
             c.AssertComponentRegistrationOrder<IAService, AnExistingComponent, A2Component>();
         }
 
-
         public IContainer RegisterScenarioAssembly(Action<IRegistrationBuilder<object, ScanningActivatorData, DynamicRegistrationStyle>> configuration = null)
         {
             var cb = new ContainerBuilder();
             var config = cb.RegisterAssemblyTypes(ScenarioAssembly);
-            if (configuration != null)
-                configuration(config);
+            configuration?.Invoke(config);
+
             return cb.Build();
         }
 
-        // ReSharper disable ClassNeverInstantiated.Local
         /// <summary>
         /// Test class used in the <see cref="ScanningRegistrationTests.PreserveExistingDefaults"/> test case.
         /// </summary>
@@ -389,14 +416,12 @@ namespace Autofac.Test.Features.Scanning
         public void MetadataCanBeScannedFromAMatchingAttributeInterface()
         {
             var c = RegisterScenarioAssembly(a => a
-                .Where(t => t == typeof (ScannedComponentWithName))
+                .Where(t => t == typeof(ScannedComponentWithName))
                 .WithMetadataFrom<IHaveName>());
 
-            IComponentRegistration r;
-            c.ComponentRegistry.TryGetRegistration(new TypedService(typeof (ScannedComponentWithName)), out r);
+            c.ComponentRegistry.TryGetRegistration(new TypedService(typeof(ScannedComponentWithName)), out IComponentRegistration r);
 
-            object name;
-            r.Metadata.TryGetValue("Name", out name);
+            r.Metadata.TryGetValue("Name", out object name);
 
             Assert.Equal("My Name", name);
         }
@@ -411,6 +436,111 @@ namespace Autofac.Test.Features.Scanning
                 return k;
             }));
             Assert.True(c.IsRegisteredWithKey<IAService>(k));
+        }
+
+        [Fact]
+        public void DeferredEnumerableHelperClassDoesNotGetRegistered()
+        {
+            var c = RegisterScenarioAssembly(a => a.AsImplementedInterfaces());
+
+            var implementations = c.Resolve<IEnumerable<IHaveDeferredEnumerable>>();
+
+            Assert.Single(implementations);
+        }
+
+        [Fact]
+        public void InternalClassesAreFoundByDefault()
+        {
+            // Issue #897: It may not be obvious, but our long-running behavior has been to include non-public types.
+            var c = RegisterScenarioAssembly();
+            var internalType = ScenarioAssembly.GetType("Autofac.Test.Scenarios.ScannedAssembly.InternalComponent", true);
+            Assert.True(c.IsRegistered(internalType));
+        }
+
+        [Fact]
+        public void InternalClassesCanBeFilteredOut()
+        {
+            // Issue #897: It may not be obvious, but our long-running behavior has been to include non-public types.
+            var c = RegisterScenarioAssembly(conf => conf.PublicOnly());
+            var internalType = ScenarioAssembly.GetType("Autofac.Test.Scenarios.ScannedAssembly.InternalComponent", true);
+            Assert.False(c.IsRegistered(internalType));
+        }
+
+        [Fact]
+        public void NonPublicNestedClassesAreFoundByDefault()
+        {
+            // Issue #897: It may not be obvious, but our long-running behavior has been to include non-public types.
+            var c = RegisterScenarioAssembly();
+            var privateType = ScenarioAssembly.GetType("Autofac.Test.Scenarios.ScannedAssembly.NestedComponent+PrivateComponent", true);
+            _ = ScenarioAssembly.GetType("Autofac.Test.Scenarios.ScannedAssembly.NestedComponent+InternalComponent", true);
+            c.AssertRegistered<NestedComponent>();
+            Assert.True(c.IsRegistered(privateType));
+        }
+
+        [Fact]
+        public void NonPublicNestedClassesCanBeFilteredOut()
+        {
+            // Issue #897: It may not be obvious, but our long-running behavior has been to include non-public types.
+            var c = RegisterScenarioAssembly(conf => conf.PublicOnly());
+            var privateType = ScenarioAssembly.GetType("Autofac.Test.Scenarios.ScannedAssembly.NestedComponent+PrivateComponent", true);
+            var internalType = ScenarioAssembly.GetType("Autofac.Test.Scenarios.ScannedAssembly.NestedComponent+InternalComponent", true);
+            c.AssertRegistered<NestedComponent>();
+            Assert.False(c.IsRegistered(privateType));
+        }
+
+        [Fact]
+        public void PublicNestedClassesAreScanned()
+        {
+            var c = RegisterScenarioAssembly();
+            c.AssertRegistered<NestedComponent.PublicComponent>();
+        }
+
+        [Fact]
+        public void ScannedAssembliesPreparingEventFires()
+        {
+            var preparingCalled = false;
+
+            var cb = new ContainerBuilder();
+            cb.RegisterAssemblyTypes(typeof(AComponent).GetTypeInfo().Assembly)
+                .OnPreparing(args => preparingCalled = true);
+
+            var c = cb.Build();
+
+            var a = c.Resolve<AComponent>();
+
+            Assert.True(preparingCalled);
+        }
+
+        [Fact]
+        public void ScannedAssembliesActivatedEventFires()
+        {
+            var activatedCalled = false;
+
+            var cb = new ContainerBuilder();
+            cb.RegisterAssemblyTypes(typeof(AComponent).GetTypeInfo().Assembly)
+                .OnActivated(args => activatedCalled = true);
+
+            var c = cb.Build();
+
+            var a = c.Resolve<AComponent>();
+
+            Assert.True(activatedCalled);
+        }
+
+        [Fact]
+        public void ScannedAssembliesActivatingEventFires()
+        {
+            var activatingCalled = false;
+
+            var cb = new ContainerBuilder();
+            cb.RegisterAssemblyTypes(typeof(AComponent).GetTypeInfo().Assembly)
+                .OnActivating(args => activatingCalled = true);
+
+            var c = cb.Build();
+
+            var a = c.Resolve<AComponent>();
+
+            Assert.True(activatingCalled);
         }
     }
 }

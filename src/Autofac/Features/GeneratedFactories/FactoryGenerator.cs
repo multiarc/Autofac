@@ -1,27 +1,5 @@
-﻿// This software is part of the Autofac IoC container
-// Copyright © 2011 Autofac Contributors
-// http://autofac.org
-//
-// Permission is hereby granted, free of charge, to any person
-// obtaining a copy of this software and associated documentation
-// files (the "Software"), to deal in the Software without
-// restriction, including without limitation the rights to use,
-// copy, modify, merge, publish, distribute, sublicense, and/or sell
-// copies of the Software, and to permit persons to whom the
-// Software is furnished to do so, subject to the following
-// conditions:
-//
-// The above copyright notice and this permission notice shall be
-// included in all copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-// EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-// OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-// NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-// HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-// WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-// FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-// OTHER DEALINGS IN THE SOFTWARE.
+﻿// Copyright (c) Autofac Project. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System;
 using System.Collections.Generic;
@@ -40,10 +18,15 @@ namespace Autofac.Features.GeneratedFactories
     /// </summary>
     public class FactoryGenerator
     {
-        readonly Func<IComponentContext, IEnumerable<Parameter>, Delegate> _generator;
+        private readonly Func<IComponentContext, IEnumerable<Parameter>, Delegate> _generator;
+
+        // The explicit '!' default is ok because the code is never executed, it's just used by
+        // the expression tree.
+        private static readonly ConstructorInfo RequestConstructor
+            = ReflectionExtensions.GetConstructor(() => new ResolveRequest(default!, default!, default!, default));
 
         /// <summary>
-        /// Create a factory generator.
+        /// Initializes a new instance of the <see cref="FactoryGenerator"/> class.
         /// </summary>
         /// <param name="service">The service that will be activated in
         /// order to create the products of the factory.</param>
@@ -51,21 +34,28 @@ namespace Autofac.Features.GeneratedFactories
         /// <param name="parameterMapping">The parameter mapping mode to use.</param>
         public FactoryGenerator(Type delegateType, Service service, ParameterMapping parameterMapping)
         {
-            if (service == null) throw new ArgumentNullException("service");
+            if (service == null)
+            {
+                throw new ArgumentNullException(nameof(service));
+            }
+
             Enforce.ArgumentTypeIsFunction(delegateType);
 
-            _generator = CreateGenerator((activatorContextParam, resolveParameterArray) =>
+            _generator = CreateGenerator(
+                (activatorContextParam, resolveParameterArray) =>
                 {
                     // c, service, [new Parameter(name, (object)dps)]*
-                    var resolveParams = new[] {
-                            activatorContextParam,
-                            Expression.Constant(service, typeof(Service)),
-                            Expression.NewArrayInit(typeof(Parameter), resolveParameterArray)
-                        };
+                    var resolveParams = new[]
+                    {
+                        activatorContextParam,
+                        Expression.Constant(service, typeof(Service)),
+                        Expression.NewArrayInit(typeof(Parameter), resolveParameterArray),
+                    };
 
                     // c.Resolve(...)
+                    // default! here is for reflection only
                     return Expression.Call(
-                        ReflectionExtensions.GetMethod<IComponentContext>(cc => cc.ResolveService(default(Service), default(Parameter[]))),
+                        ReflectionExtensions.GetMethod<IComponentContext>(cc => cc.ResolveService(default!, default!)),
                         resolveParams);
                 },
                 delegateType,
@@ -73,39 +63,48 @@ namespace Autofac.Features.GeneratedFactories
         }
 
         /// <summary>
-        /// Create a factory generator.
+        /// Initializes a new instance of the <see cref="FactoryGenerator"/> class.
         /// </summary>
+        /// <param name="service">The service that will be activated in
+        /// order to create the products of the factory.</param>
         /// <param name="productRegistration">The component that will be activated in
         /// order to create the products of the factory.</param>
         /// <param name="delegateType">The delegate to provide as a factory.</param>
         /// <param name="parameterMapping">The parameter mapping mode to use.</param>
-        public FactoryGenerator(Type delegateType, IComponentRegistration productRegistration, ParameterMapping parameterMapping)
+        public FactoryGenerator(Type delegateType, Service service, ServiceRegistration productRegistration, ParameterMapping parameterMapping)
         {
-            if (productRegistration == null) throw new ArgumentNullException("productRegistration");
             Enforce.ArgumentTypeIsFunction(delegateType);
 
-            _generator = CreateGenerator((activatorContextParam, resolveParameterArray) =>
+            _generator = CreateGenerator(
+                (activatorContextParam, resolveParameterArray) =>
                 {
-                    // productRegistration, [new Parameter(name, (object)dps)]*
-                    var resolveParams = new Expression[] {
-                        Expression.Constant(productRegistration, typeof(IComponentRegistration)),
-                        Expression.NewArrayInit(typeof(Parameter), resolveParameterArray)
-                    };
+                    // new ResolveRequest(service, productRegistration, [new Parameter(name, (object)dps)])*)
+                    var newExpression = Expression.New(
+                        RequestConstructor,
+                        Expression.Constant(service, typeof(Service)),
+                        Expression.Constant(productRegistration, typeof(ServiceRegistration)),
+                        Expression.NewArrayInit(typeof(Parameter), resolveParameterArray),
+                        Expression.Constant(null, typeof(IComponentRegistration)));
 
                     // c.Resolve(...)
+                    // default! for reflection only
                     return Expression.Call(
                         activatorContextParam,
-                        ReflectionExtensions.GetMethod<IComponentContext>(cc => cc.ResolveComponent(default(IComponentRegistration), default(Parameter[]))),
-                        resolveParams);
+                        ReflectionExtensions.GetMethod<IComponentContext>(cc => cc.ResolveComponent(
+                            new ResolveRequest(default!, default, default(Parameter[])!, default))),
+                        newExpression);
                 },
                 delegateType,
                 GetParameterMapping(delegateType, parameterMapping));
         }
 
-        static ParameterMapping GetParameterMapping(Type delegateType, ParameterMapping configuredParameterMapping)
+        private static ParameterMapping GetParameterMapping(Type delegateType, ParameterMapping configuredParameterMapping)
         {
             if (configuredParameterMapping == ParameterMapping.Adaptive)
+            {
                 return DelegateTypeIsFunc(delegateType) ? ParameterMapping.ByType : ParameterMapping.ByName;
+            }
+
             return configuredParameterMapping;
         }
 
@@ -114,16 +113,15 @@ namespace Autofac.Features.GeneratedFactories
             return delegateType.Name.StartsWith("Func`", StringComparison.Ordinal);
         }
 
-        static Func<IComponentContext, IEnumerable<Parameter>, Delegate> CreateGenerator(Func<Expression, Expression[], Expression> makeResolveCall, Type delegateType, ParameterMapping pm)
+        private static Func<IComponentContext, IEnumerable<Parameter>, Delegate> CreateGenerator(Func<Expression, Expression[], Expression> makeResolveCall, Type delegateType, ParameterMapping pm)
         {
             // (c, p) => ([dps]*) => (drt)Resolve(c, productRegistration, [new NamedParameter(name, (object)dps)]*)
-
             // (c, p)
             var activatorContextParam = Expression.Parameter(typeof(IComponentContext), "c");
             var activatorParamsParam = Expression.Parameter(typeof(IEnumerable<Parameter>), "p");
             var activatorParams = new[] { activatorContextParam, activatorParamsParam };
 
-            var invoke = delegateType.GetTypeInfo().GetDeclaredMethod("Invoke");
+            var invoke = delegateType.GetDeclaredMethod("Invoke");
 
             // [dps]*
             var creatorParams = invoke
@@ -131,13 +129,13 @@ namespace Autofac.Features.GeneratedFactories
                 .Select(pi => Expression.Parameter(pi.ParameterType, pi.Name))
                 .ToList();
 
-            Expression resolveCast = null;
+            Expression? resolveCast = null;
             if (DelegateTypeIsFunc(delegateType) && pm == ParameterMapping.ByType)
             {
                 // Issue #269:
                 // If we're resolving a Func<X1...XN>() and there are duplicate input parameter types
                 // and the parameter mapping is by type, we shouldn't be able to resolve it.
-                var arguments = delegateType.GetTypeInfo().GenericTypeArguments;
+                var arguments = delegateType.GenericTypeArguments;
                 var returnType = arguments.Last();
 
                 // Remove the return type to check the list of input types only.
@@ -146,7 +144,8 @@ namespace Autofac.Features.GeneratedFactories
                 {
                     // There are duplicate input types - that's a problem. Throw
                     // when the function is invoked.
-                    var message = String.Format(CultureInfo.CurrentCulture, GeneratedFactoryRegistrationSourceResources.DuplicateTypesInTypeMappedFuncParameterList, returnType.AssemblyQualifiedName, String.Join(", ", arguments.Cast<object>().ToArray()));
+                    object[] argumentsArray = arguments.ToArray();
+                    var message = string.Format(CultureInfo.CurrentCulture, GeneratedFactoryRegistrationSourceResources.DuplicateTypesInTypeMappedFuncParameterList, returnType.AssemblyQualifiedName, string.Join(", ", argumentsArray));
                     resolveCast = Expression.Throw(Expression.Constant(new DependencyResolutionException(message)), invoke.ReturnType);
                 }
             }
@@ -174,39 +173,19 @@ namespace Autofac.Features.GeneratedFactories
             return activator.Compile();
         }
 
-
-
-        static Expression[] MapParameters(IEnumerable<ParameterExpression> creatorParams, ParameterMapping pm)
+        private static Expression[] MapParameters(IEnumerable<ParameterExpression> creatorParams, ParameterMapping pm)
         {
-            switch (pm)
+            return pm switch
             {
-                case ParameterMapping.ByType:
-                    return creatorParams
-                            .Select(p => Expression.New(
-                                typeof(TypedParameter).GetMatchingConstructor(new[] { typeof(Type), typeof(object) }),
-                                Expression.Constant(p.Type, typeof(Type)), Expression.Convert(p, typeof(object))))
-                            .OfType<Expression>()
-                            .ToArray();
-
-                case ParameterMapping.ByPosition:
-                    return creatorParams
-                        .Select((p, i) => Expression.New(
-                                typeof(PositionalParameter).GetMatchingConstructor(new[] { typeof(int), typeof(object) }),
-                                Expression.Constant(i, typeof(int)), Expression.Convert(p, typeof(object))))
-                            .OfType<Expression>()
-                            .ToArray();
-
-                // ReSharper disable RedundantCaseLabel
-                case ParameterMapping.ByName:
-                // ReSharper restore RedundantCaseLabel
-                default:
-                    return creatorParams
-                            .Select(p => Expression.New(
-                                typeof(NamedParameter).GetMatchingConstructor(new[] { typeof(string), typeof(object) }),
-                                Expression.Constant(p.Name, typeof(string)), Expression.Convert(p, typeof(object))))
-                            .OfType<Expression>()
-                            .ToArray();
-            }
+                ParameterMapping.ByType => creatorParams
+                                            .Select(p => Expression.New(typeof(TypedParameter).GetMatchingConstructor(new[] { typeof(Type), typeof(object) }), Expression.Constant(p.Type, typeof(Type)), Expression.Convert(p, typeof(object))))
+                                            .ToArray(),
+                ParameterMapping.ByPosition => creatorParams
+                                                 .Select((p, i) => Expression.New(typeof(PositionalParameter).GetMatchingConstructor(new[] { typeof(int), typeof(object) }), Expression.Constant(i, typeof(int)), Expression.Convert(p, typeof(object))))
+                                                 .ToArray(),
+                _ => creatorParams.Select(p => Expression.New(typeof(NamedParameter).GetMatchingConstructor(new[] { typeof(string), typeof(object) }), Expression.Constant(p.Name, typeof(string)), Expression.Convert(p, typeof(object))))
+                                  .ToArray(),
+            };
         }
 
         /// <summary>
@@ -217,8 +196,15 @@ namespace Autofac.Features.GeneratedFactories
         /// <returns>A factory delegate that will work within the context.</returns>
         public Delegate GenerateFactory(IComponentContext context, IEnumerable<Parameter> parameters)
         {
-            if (context == null) throw new ArgumentNullException("context");
-            if (parameters == null) throw new ArgumentNullException("parameters");
+            if (context == null)
+            {
+                throw new ArgumentNullException(nameof(context));
+            }
+
+            if (parameters == null)
+            {
+                throw new ArgumentNullException(nameof(parameters));
+            }
 
             return _generator(context.Resolve<ILifetimeScope>(), parameters);
         }

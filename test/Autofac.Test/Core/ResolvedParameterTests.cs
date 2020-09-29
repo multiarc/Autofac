@@ -1,8 +1,11 @@
-﻿using System;
+﻿// Copyright (c) Autofac Project. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
+using System;
 using System.Linq;
 using System.Reflection;
-using Xunit;
 using Autofac.Core;
+using Xunit;
 
 namespace Autofac.Test.Core
 {
@@ -24,11 +27,13 @@ namespace Autofac.Test.Core
             Assert.Equal("aaaaa", s);
         }
 
-// ReSharper disable UnusedTypeParameter
-        public interface ISomething<T> { }
-// ReSharper restore UnusedTypeParameter
+        public interface ISomething<T>
+        {
+        }
 
-        public class ConcreteSomething<T> : ISomething<T> { }
+        public class ConcreteSomething<T> : ISomething<T>
+        {
+        }
 
         public class SomethingDecorator<T> : ISomething<T>
         {
@@ -83,12 +88,11 @@ namespace Autofac.Test.Core
         {
             var k = new object();
             var builder = new ContainerBuilder();
-            builder.RegisterInstance((object) 'a').Keyed<char>(k);
+            builder.RegisterInstance((object)'a').Keyed<char>(k);
             var container = builder.Build();
             var rp = ResolvedParameter.ForKeyed<char>(k);
             var cp = GetCharParameter();
-            Func<object> vp;
-            Assert.True(rp.CanSupplyValue(cp, container, out vp));
+            Assert.True(rp.CanSupplyValue(cp, container, out Func<object> vp));
         }
 
         [Fact]
@@ -96,15 +100,14 @@ namespace Autofac.Test.Core
         {
             var rp = ResolvedParameter.ForKeyed<char>(new object());
             var cp = GetCharParameter();
-            Func<object> vp;
-            var canSupply = rp.CanSupplyValue(cp, new ContainerBuilder().Build(), out vp);
+            var canSupply = rp.CanSupplyValue(cp, new ContainerBuilder().Build(), out Func<object> vp);
             Assert.False(canSupply);
         }
 
-        static ParameterInfo GetCharParameter()
+        private static ParameterInfo GetCharParameter()
         {
             return typeof(string)
-                .GetConstructor(new[] {typeof (char), typeof (int)})
+                .GetConstructor(new[] { typeof(char), typeof(int) })
                 .GetParameters()
                 .First();
         }

@@ -1,117 +1,50 @@
-﻿using System;
-using Autofac.Builder;
-using Xunit;
+﻿// Copyright (c) Autofac Project. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Linq;
 using Autofac.Core;
-using Autofac.Test.Scenarios.Dependencies;
+using Autofac.Core.Resolving;
+using Moq;
+using Xunit;
 
 namespace Autofac.Test.Core.Resolving
 {
     public class ResolveOperationTests
     {
         [Fact]
-        public void CtorPropDependencyOkOrder1()
+        public void NullLifetimeScope_ThrowsArgumentNullException()
         {
-            var cb = new ContainerBuilder();
-            cb.RegisterType<DependsByCtor>().SingleInstance();
-            cb.RegisterType<DependsByProp>().SingleInstance().PropertiesAutowired(PropertyWiringOptions.AllowCircularDependencies);
-
-            var c = cb.Build();
-            var dbp = c.Resolve<DependsByProp>();
-
-            Assert.NotNull(dbp.Dep);
-            Assert.NotNull(dbp.Dep.Dep);
-            Assert.Same(dbp, dbp.Dep.Dep);
+            var ex = Assert.Throws<ArgumentNullException>(() => new ResolveOperation(null!, new DiagnosticListener("SomeListener")));
+            Assert.Contains("(Parameter 'mostNestedLifetimeScope')", ex.Message);
         }
 
         [Fact]
-        public void CtorPropDependencyOkOrder2()
+        public void NullDiagnosticSource_ThrowsArgumentNullException()
         {
-            var cb = new ContainerBuilder();
-            cb.RegisterType<DependsByCtor>().SingleInstance();
-            cb.RegisterType<DependsByProp>().SingleInstance().PropertiesAutowired(PropertyWiringOptions.AllowCircularDependencies);
-
-            var c = cb.Build();
-            var dbc = c.Resolve<DependsByCtor>();
-
-            Assert.NotNull(dbc.Dep);
-            Assert.NotNull(dbc.Dep.Dep);
-            Assert.Same(dbc, dbc.Dep.Dep);
+            var ex = Assert.Throws<ArgumentNullException>(() => new ResolveOperation(Mock.Of<ISharingLifetimeScope>(), null!));
+            Assert.Contains("(Parameter 'diagnosticSource')", ex.Message);
         }
 
         [Fact]
-        public void CtorPropDependencyFactoriesOrder1()
+        public void EmptyInProgessRequestWhenInitializing()
         {
-            var cb = new ContainerBuilder();
-            cb.RegisterType<DependsByCtor>();
-            cb.RegisterType<DependsByProp>().PropertiesAutowired(PropertyWiringOptions.AllowCircularDependencies);
+            var resolveOperation = new ResolveOperation(Mock.Of<ISharingLifetimeScope>(), new DiagnosticListener("SomeName"));
 
-            var c = cb.Build();
-            Assert.Throws<DependencyResolutionException>(() => c.Resolve<DependsByProp>());
+            var inProgressStack = resolveOperation.InProgressRequests;
+
+            Assert.Empty(inProgressStack);
         }
 
         [Fact]
-        public void CtorPropDependencyFactoriesOrder2()
+        public void GetOrCreateInstanceThrowsArgumentNullExceptionWhenResolveRequestIsNull()
         {
-            var cb = new ContainerBuilder();
-            var ac = 0;
-            cb.RegisterType<DependsByCtor>().OnActivating(e => { ac = 2; });
-            cb.RegisterType<DependsByProp>().OnActivating(e => { ac = 1; })
-                .PropertiesAutowired(PropertyWiringOptions.AllowCircularDependencies);
+            var lifetimeScope = Mock.Of<ISharingLifetimeScope>();
+            var resolveOperation = new ResolveOperation(lifetimeScope, new DiagnosticListener("SomeName"));
 
-            var c = cb.Build();
-            Assert.Throws<DependencyResolutionException>(() => c.Resolve<DependsByCtor>());
-
-            Assert.Equal(2, ac);
-        }
-
-
-        [Fact]
-        public void ActivatingArgsSuppliesParameters()
-        {
-            const int provided = 12;
-            var passed = 0;
-
-            var builder = new ContainerBuilder();
-            builder.RegisterType<object>()
-                .OnActivating(e => passed = e.Parameters.TypedAs<int>());
-            var container = builder.Build();
-
-            container.Resolve<object>(TypedParameter.From(provided));
-            Assert.Equal(provided, passed);
-        }
-
-        [Fact]
-        public void ActivatedArgsSuppliesParameters()
-        {
-            const int provided = 12;
-            var passed = 0;
-
-            var builder = new ContainerBuilder();
-            builder.RegisterType<object>()
-                .OnActivated(e => passed = e.Parameters.TypedAs<int>());
-            var container = builder.Build();
-
-            container.Resolve<object>(TypedParameter.From(provided));
-            Assert.Equal(provided, passed);
-        }
-
-        [Fact]
-        public void ChainedOnActivatedEventsAreInvokedWithinASingleResolveOperation()
-        {
-            var builder = new ContainerBuilder();
-
-            bool secondEventRaised = false;
-            builder.RegisterType<object>()
-                .Named<object>("second")
-                .OnActivated(e => secondEventRaised = true);
-
-            builder.RegisterType<object>()
-                .OnActivated(e => e.Context.ResolveNamed<object>("second"));
-
-            var container = builder.Build();
-            container.Resolve<object>();
-
-            Assert.True(secondEventRaised);
+            Assert.Throws<ArgumentNullException>(() => resolveOperation.GetOrCreateInstance(lifetimeScope, null!));
         }
 
         [Fact]
@@ -119,12 +52,123 @@ namespace Autofac.Test.Core.Resolving
         {
             IComponentContext ctx = null;
             var builder = new ContainerBuilder();
-            builder.Register(c => { ctx = c; return new object(); });
+            builder.Register(c =>
+            {
+                ctx = c;
+                return new object();
+            });
             builder.RegisterInstance("Hello");
             var container = builder.Build();
             container.Resolve<string>();
             container.Resolve<object>();
             Assert.Throws<ObjectDisposedException>(() => ctx.Resolve<string>());
+        }
+
+        [Fact]
+        public void OperationRaisesSuccessTraceEvents()
+        {
+            var builder = new ContainerBuilder();
+
+            builder.RegisterInstance("Hello");
+
+            var container = builder.Build();
+            var mockTracer = Mocks.GetTracer();
+            container.SubscribeToDiagnostics(mockTracer);
+
+            var scope = container.Resolve<ILifetimeScope>() as ISharingLifetimeScope;
+
+            var resolveOp = new ResolveOperation(scope, container.DiagnosticSource);
+
+            var raisedEvents = new List<string>();
+
+            var request = new ResolveRequest(new TypedService(typeof(string)), scope.ResolvableImplementationFor<string>(), Enumerable.Empty<Parameter>());
+
+            mockTracer.OperationStarting += (op, req) =>
+            {
+                raisedEvents.Add("opstart");
+                Assert.Equal(resolveOp, op);
+                Assert.Equal(request, req);
+            };
+
+            mockTracer.RequestStarting += (op, ctxt) =>
+            {
+                raisedEvents.Add("reqstart");
+                Assert.Equal(resolveOp, op);
+                Assert.Equal(request.Service, ctxt.Service);
+            };
+
+            mockTracer.RequestSucceeding += (op, ctxt) =>
+            {
+                raisedEvents.Add("reqsuccess");
+                Assert.Equal(resolveOp, op);
+            };
+
+            mockTracer.OperationSucceeding += (op, instance) =>
+            {
+                raisedEvents.Add("opsuccess");
+                Assert.Equal("Hello", instance);
+            };
+
+            resolveOp.Execute(request);
+
+            Assert.Equal(new[] { "opstart", "reqstart", "reqsuccess", "opsuccess" }, raisedEvents);
+        }
+
+        [Fact]
+        public void OperationRaisesFailureTraceEvents()
+        {
+            var builder = new ContainerBuilder();
+
+            builder.Register<string>(ctxt => throw new InvalidOperationException());
+
+            var container = builder.Build();
+            var mockTracer = Mocks.GetTracer();
+            container.SubscribeToDiagnostics(mockTracer);
+
+            var scope = container.Resolve<ILifetimeScope>() as ISharingLifetimeScope;
+
+            var resolveOp = new ResolveOperation(scope, container.DiagnosticSource);
+
+            var raisedEvents = new List<string>();
+
+            var request = new ResolveRequest(new TypedService(typeof(string)), scope.ResolvableImplementationFor<string>(), Enumerable.Empty<Parameter>());
+
+            mockTracer.OperationStarting += (op, req) =>
+            {
+                raisedEvents.Add("opstart");
+                Assert.Equal(resolveOp, op);
+                Assert.Equal(request, req);
+            };
+
+            mockTracer.RequestStarting += (op, ctxt) =>
+            {
+                raisedEvents.Add("reqstart");
+                Assert.Equal(resolveOp, op);
+                Assert.Equal(request.Service, ctxt.Service);
+            };
+
+            mockTracer.RequestFailing += (op, ctxt, ex) =>
+            {
+                raisedEvents.Add("reqfail");
+                Assert.Equal(resolveOp, op);
+                Assert.IsType<DependencyResolutionException>(ex);
+            };
+
+            mockTracer.OperationFailing += (op, ex) =>
+            {
+                raisedEvents.Add("opfail");
+                Assert.IsType<DependencyResolutionException>(ex);
+            };
+
+            try
+            {
+                resolveOp.Execute(request);
+            }
+            catch
+            {
+            }
+
+            Assert.Equal(new[] { "opstart", "reqstart", "reqfail", "opfail" }, raisedEvents);
         }
     }
 }

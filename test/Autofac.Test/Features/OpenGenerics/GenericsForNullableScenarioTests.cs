@@ -1,17 +1,23 @@
-﻿using Autofac.Test.Util;
+﻿// Copyright (c) Autofac Project. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
+using Autofac.Test.Util;
 using Xunit;
 
 namespace Autofac.Test.Features.OpenGenerics
 {
-    public interface IItemProducer<T> { }
-
-    public class NullableProducer<T> : IItemProducer<T?>
-        where T : struct
-    {
-    }
     public class GenericsForNullableScenarioTests
     {
-        IContainer _container;
+        public interface IItemProducer<T>
+        {
+        }
+
+        public class NullableProducer<T> : IItemProducer<T?>
+            where T : struct
+        {
+        }
+
+        private readonly IContainer _container;
 
         public GenericsForNullableScenarioTests()
         {

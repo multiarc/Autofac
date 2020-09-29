@@ -1,12 +1,15 @@
-﻿using System.Collections.Generic;
-using System.Linq;
-using Xunit;
-using Autofac.Core;
+﻿// Copyright (c) Autofac Project. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
 using System;
+using System.Collections.Generic;
+using System.Linq;
+using Autofac.Core;
+using Xunit;
 
 namespace Autofac.Test
 {
-    static class Assertions
+    internal static class Assertions
     {
         public static void AssertRegistered<TService>(this IComponentContext context)
         {
@@ -48,8 +51,23 @@ namespace Autofac.Test
 
         public static IComponentRegistration RegistrationFor<TComponent>(this IComponentContext context)
         {
-            IComponentRegistration r;
-            Assert.True(context.ComponentRegistry.TryGetRegistration(new TypedService(typeof(TComponent)), out r));
+            return RegistrationFor(context, typeof(TComponent));
+        }
+
+        public static IComponentRegistration RegistrationFor(this IComponentContext context, Type componenType)
+        {
+            Assert.True(context.ComponentRegistry.TryGetRegistration(new TypedService(componenType), out var r));
+            return r;
+        }
+
+        public static ServiceRegistration ResolvableImplementationFor<TComponent>(this IComponentContext context)
+        {
+            return ResolvableImplementationFor(context, typeof(TComponent));
+        }
+
+        public static ServiceRegistration ResolvableImplementationFor(this IComponentContext context, Type componentType)
+        {
+            Assert.True(context.ComponentRegistry.TryGetServiceRegistration(new TypedService(componentType), out var r));
             return r;
         }
 
@@ -80,6 +98,5 @@ namespace Autofac.Test
                 .Select(registration => types.FirstOrDefault(type => registration.Activator.LimitType == type))
                 .Where(foundType => foundType != null);
         }
-
     }
 }

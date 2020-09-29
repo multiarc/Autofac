@@ -1,26 +1,18 @@
-﻿using System;
-using System.Collections.Generic;
+﻿// Copyright (c) Autofac Project. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
+using System;
 using System.Linq;
-using System.Text;
 using Autofac.Builder;
 using Autofac.Core;
-using Xunit;
 using Autofac.Features.OwnedInstances;
+using Autofac.Test.Util;
+using Xunit;
 
 namespace Autofac.Test.Features.OwnedInstances
 {
     public class OwnedInstanceRegistrationSourceTests
     {
-        [Fact]
-        public void WhenTIsRegistered_OwnedTCanBeResolved()
-        {
-            var cb = new ContainerBuilder();
-            cb.RegisterType<DisposeTracker>();
-            var c = cb.Build();
-            var owned = c.Resolve<Owned<DisposeTracker>>();
-            Assert.NotNull(owned.Value);
-        }
-
         [Fact]
         public void CallingDisposeOnGeneratedOwnedT_DisposesOwnedInstance()
         {
@@ -50,16 +42,34 @@ namespace Autofac.Test.Features.OwnedInstances
         }
 
         [Fact]
+        public void CanResolveAndUse_OwnedGeneratedFactory()
+        {
+            var cb = new ContainerBuilder();
+            cb.Register((c, p) => new ClassWithFactory(p.Named<string>("name")));
+            cb.RegisterGeneratedFactory<ClassWithFactory.OwnedFactory>();
+            var container = cb.Build();
+            var factory = container.Resolve<ClassWithFactory.OwnedFactory>();
+            bool isAccessed;
+            using (var owner = factory("test"))
+            {
+                Assert.Equal("test", owner.Value.Name);
+                isAccessed = true;
+            }
+
+            Assert.True(isAccessed);
+        }
+
+        [Fact]
         public void IfInnerTypeIsNotRegistered_OwnedTypeIsNotEither()
         {
             var c = new ContainerBuilder().Build();
-            Assert.False(c.IsRegistered<Owned<Object>>());
+            Assert.False(c.IsRegistered<Owned<object>>());
         }
 
         [Fact]
         public void ResolvingOwnedInstanceByName_ReturnsValueByName()
         {
-            object o = new object();
+            var o = new object();
 
             var builder = new ContainerBuilder();
             builder.RegisterInstance(o).Named<object>("o");
@@ -68,18 +78,6 @@ namespace Autofac.Test.Features.OwnedInstances
             var owned = container.ResolveNamed<Owned<object>>("o");
 
             Assert.Same(o, owned.Value);
-        }
-
-        public class ExposesScopeTag
-        {
-            readonly ILifetimeScope _myScope;
-
-            public ExposesScopeTag(ILifetimeScope myScope)
-            {
-                _myScope = myScope;
-            }
-
-            public object Tag { get { return _myScope.Tag; } }
         }
 
         [Fact]
@@ -93,33 +91,44 @@ namespace Autofac.Test.Features.OwnedInstances
             Assert.Equal(new TypedService(typeof(ExposesScopeTag)), est.Value.Tag);
         }
 
+        [Fact]
+        public void WhenTIsRegistered_OwnedTCanBeResolved()
+        {
+            var cb = new ContainerBuilder();
+            cb.RegisterType<DisposeTracker>();
+            var c = cb.Build();
+            var owned = c.Resolve<Owned<DisposeTracker>>();
+            Assert.NotNull(owned.Value);
+        }
+
         public class ClassWithFactory
         {
-            public string Name { get; set; }
-
-            public delegate Owned<ClassWithFactory> OwnedFactory(string name);
-
             public ClassWithFactory(string name)
             {
                 Name = name;
             }
+
+            public delegate Owned<ClassWithFactory> OwnedFactory(string name);
+
+            public string Name { get; set; }
         }
 
-        [Fact]
-        public void CanResolveAndUse_OwnedGeneratedFactory()
+        public class ExposesScopeTag
         {
-            var cb = new ContainerBuilder();
-            cb.Register((c,p) => new ClassWithFactory(p.Named<string>("name")));
-            cb.RegisterGeneratedFactory<ClassWithFactory.OwnedFactory>();
-            var container = cb.Build();
-            var factory = container.Resolve<ClassWithFactory.OwnedFactory>();
-            bool isAccessed;
-            using(var owner = factory("test"))
+            private readonly ILifetimeScope _myScope;
+
+            public ExposesScopeTag(ILifetimeScope myScope)
             {
-                Assert.Equal("test", owner.Value.Name); 
-                isAccessed = true;
+                _myScope = myScope;
             }
-            Assert.True(isAccessed);
+
+            public object Tag
+            {
+                get
+                {
+                    return _myScope.Tag;
+                }
+            }
         }
     }
 }

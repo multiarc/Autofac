@@ -1,30 +1,7 @@
-﻿// This software is part of the Autofac IoC container
-// Copyright © 2011 Autofac Contributors
-// http://autofac.org
-//
-// Permission is hereby granted, free of charge, to any person
-// obtaining a copy of this software and associated documentation
-// files (the "Software"), to deal in the Software without
-// restriction, including without limitation the rights to use,
-// copy, modify, merge, publish, distribute, sublicense, and/or sell
-// copies of the Software, and to permit persons to whom the
-// Software is furnished to do so, subject to the following
-// conditions:
-//
-// The above copyright notice and this permission notice shall be
-// included in all copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-// EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-// OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-// NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-// HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-// WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-// FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-// OTHER DEALINGS IN THE SOFTWARE.
+﻿// Copyright (c) Autofac Project. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
 
 using System;
-using Autofac.Util;
 
 namespace Autofac.Core
 {
@@ -39,26 +16,20 @@ namespace Autofac.Core
         /// <param name="serviceType">Type of the service.</param>
         public TypedService(Type serviceType)
         {
-            ServiceType = Enforce.ArgumentNotNull(serviceType, "serviceType");
+            ServiceType = serviceType ?? throw new ArgumentNullException(nameof(serviceType));
         }
 
         /// <summary>
         /// Gets the type of the service.
         /// </summary>
         /// <value>The type of the service.</value>
-        public Type ServiceType { get; private set; }
+        public Type ServiceType { get; }
 
         /// <summary>
         /// Gets a human-readable description of the service.
         /// </summary>
         /// <value>The description.</value>
-        public override string Description
-        {
-            get
-            {    
-                return ServiceType.FullName;
-            }
-        }
+        public override string Description => ServiceType.FullName;
 
         /// <summary>
         /// Indicates whether the current object is equal to another object of the same type.
@@ -67,22 +38,24 @@ namespace Autofac.Core
         /// <returns>
         /// true if the current object is equal to the <paramref name="other" /> parameter; otherwise, false.
         /// </returns>
-        public bool Equals(TypedService other)
+        public bool Equals(TypedService? other)
         {
             if (other == null)
+            {
                 return false;
+            }
 
             return ServiceType == other.ServiceType;
         }
 
         /// <summary>
-        /// Determines whether the specified <see cref="T:System.Object"/> is equal to the current <see cref="T:System.Object"/>.
+        /// Determines whether the specified <see cref="object"/> is equal to the current <see cref="object"/>.
         /// </summary>
-        /// <param name="obj">The <see cref="T:System.Object"/> to compare with the current <see cref="T:System.Object"/>.</param>
+        /// <param name="obj">The <see cref="object"/> to compare with the current <see cref="object"/>.</param>
         /// <returns>
-        /// true if the specified <see cref="T:System.Object"/> is equal to the current <see cref="T:System.Object"/>; otherwise, false.
+        /// true if the specified <see cref="object"/> is equal to the current <see cref="object"/>; otherwise, false.
         /// </returns>
-        /// <exception cref="T:System.NullReferenceException">The <paramref name="obj"/> parameter is null.</exception>
+        /// <exception cref="NullReferenceException">The <paramref name="obj"/> parameter is null.</exception>
         public override bool Equals(object obj)
         {
             return Equals(obj as TypedService);
@@ -92,7 +65,7 @@ namespace Autofac.Core
         /// Serves as a hash function for a particular type.
         /// </summary>
         /// <returns>
-        /// A hash code for the current <see cref="T:System.Object"/>.
+        /// A hash code for the current <see cref="object"/>.
         /// </returns>
         public override int GetHashCode()
         {
@@ -107,7 +80,11 @@ namespace Autofac.Core
         /// <returns>A new service with the service type.</returns>
         public Service ChangeType(Type newType)
         {
-            if (newType == null) throw new ArgumentNullException("newType");
+            if (newType == null)
+            {
+                throw new ArgumentNullException(nameof(newType));
+            }
+
             return new TypedService(newType);
         }
     }
